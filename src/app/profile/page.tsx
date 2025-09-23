@@ -21,6 +21,7 @@ export default function page() {
       smiles: 3,
       sparkles: 1,
     },
+
     // ...他の投稿
   ];
 
@@ -55,7 +56,7 @@ export default function page() {
                 </div>
             </div>
             {/* プロフィール（自己紹介文）追加 */}
-            <div style={{ paddingLeft: "24px", paddingRight: "24px", marginBottom: "10px", color: "#333", fontSize: "17px" }}>
+            <div style={{ paddingLeft: "23px", paddingRight: "24px", marginBottom: "10px", color: "#333", fontSize: "17px" }}>
                 よろしくお願いします。
             </div>
 
