@@ -1,0 +1,29 @@
+.container {
+  padding: 1rem;
+  background: #fdfdfd;
+  max-width: 600px;
+  margin: auto;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.closeButton {
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+.typeButton {
+  border: 1px solid #ccc;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.typeButtonActive {
+  background: #e5e7eb; /* グレー */
+}
