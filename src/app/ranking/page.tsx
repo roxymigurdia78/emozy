@@ -19,8 +19,10 @@ export default function profile() {
             />
         </Link>    
     </header>
+
+
     
-            <footer style={{
+    <footer style={{
         backgroundColor: "#f3f2f2ac",
         height: "75px",
         display: "flex",
