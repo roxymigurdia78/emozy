@@ -1,0 +1,8 @@
+.typeButton {
+  border: 1px solid #414d42;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+

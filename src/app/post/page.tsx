@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./PostPage.module.css";
+import Link from "next/link";
+import Image from "next/image";
+
 
 export default function PostPage() {
   const router = useRouter();
@@ -61,62 +64,86 @@ export default function PostPage() {
     router.push("/home");
   };
 
-  return (
+  return(
+    <>
+        <header className={styles.header1}>
+            <Link href="/home">
+            <Image
+                src="/images/title.png"
+                alt="title"
+                width={150}
+                height={150}
+                className={styles.logo}
+            />
+            </Link>
+        </header>
+    
     <div className={styles.container}>
-      {/* 上部バー */}
-      <div className="styles.header">
-        <button onClick={() => router.push("/home")} className="text-xl">
-          ×
-        </button>
-        <h1 className="text-lg font-bold">新規投稿</h1>
-      </div>
-
-      {/* 投稿タイプ選択 */}
-      <div className="my-4 flex gap-4">
-        <button
-          className={`${styles.typeButton} ${
-            postType === "text" ? styles.typeButtonActive : ""
-          }`}
-          onClick={() => {
-            setPostType("text");
-            setPhoto(null);
-            setPreview(null);
-          }}
-        >
-          テキスト
-        </button>
-        <button
-          className={`${styles.typeButton} ${
-            postType === "photo" ? styles.typeButtonActive : ""
-          }`}
-          onClick={() => {
-            setPostType("photo");
-            setText("");
-          }}
-        >
-          写真
-        </button>
-      </div>
-
-      {/* 投稿内容 */}
-      {postType === "text" && (
-        <textarea
-          className="w-full border p-2"
-          rows={5}
-          placeholder="ここに入力"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-        />
-      )}
-
-      {postType === "photo" && (
-        <div>
-          <input type="file" accept="image/*" onChange={handleFileChange} />
-          {preview && (
-            <img src={preview} alt="preview" className="mt-2 w-48 rounded" />
-          )}
+        {/* 上部バー */}
+        <div className="styles.header">
+            <button onClick={() => router.push("/home")} className="text-xl">
+                ×
+            </button>
+            <h1 className="text-lg font-bold">新規投稿</h1>
         </div>
-      )}
+
+        {/* 投稿タイプ選択 */}
+        <div className="my-4 flex gap-4">
+            <button
+                className={`${styles.typeButton} ${
+                    postType === "text" ? styles.typeButtonActive : ""
+                }`}
+                onClick={() => {
+                    setPostType("text");
+                    setPhoto(null);
+                    setPreview(null);
+                }}
+            >
+                テキスト
+            </button>
+            <button
+                className={`${styles.typeButton} ${
+                    postType === "photo" ? styles.typeButtonActive : ""
+                }`}
+                onClick={() => {
+                    setPostType("photo");
+                    setText("");
+                }}
+            >
+                写真
+            </button>
+        </div>
+
+        {/* 投稿内容 */}
+        {postType === "text" && (
+            <textarea
+                className="w-full border p-2"
+                rows={5}
+                placeholder="ここに入力"
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+            />
+        )}
+
+        {postType === "photo" && (
+            <div>
+                <label className={styles.fileLabel}>
+                    写真を選択
+                    <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={handleFileChange}
+                        className = {styles.fileInput}
+                    />
+                </label>
+                {preview ? 
+                    (<img src={preview} alt="preview" className="mt-2 w-48 rounded" />)
+                    : 
+                    (<p className={styles.noFile}>写真が選択されていません</p>
+                )}
+            </div>
+            
+        )}
 
       {/* 感情選択 */}
       <div className="mt-6">
@@ -174,5 +201,6 @@ export default function PostPage() {
         シェアする
       </button>
     </div>
+    </>
   );
 }
