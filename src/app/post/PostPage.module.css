@@ -16,6 +16,29 @@
   cursor: pointer;
 }
 
+.fileInput {
+  display: none; /* 標準のUIは隠す */
+}
+
+.fileLabel {
+  display: inline-block;
+  color: blue;
+  cursor: pointer;
+  text-decoration: underline;
+  margin-top: 8px;
+}
+
+.header1{
+    background-Color:#7ADAD5;
+    height:100px;
+    display:flex;
+    align-items: center;
+}
+
+.logo {
+  margin-left: 5%;
+}
+
 .typeButton {
   border: 1px solid #ccc;
   padding: 0.5rem 1rem;
@@ -25,5 +48,5 @@
 }
 
 .typeButtonActive {
-  background: #e5e7eb; /* グレー */
+    background: #e5e7eb;
 }
