@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import Toukou from "../components/toukou";
-export default function profile() {
+export default function page() {
     const emotions = [
         "楽しい", "寒い", "暑い", "悲しい", "眠い", "嬉しい", "疲れた", "びっくり", "怒り", "感謝"
     ];
@@ -28,7 +28,7 @@ export default function profile() {
       sparkles: 1,
     },
     // ...他の投稿
-    
+
   ];
     return (
         <div>
