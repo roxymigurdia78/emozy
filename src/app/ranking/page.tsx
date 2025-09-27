@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import Toukou from "../components/toukou";
-export default function page() {
+export default function Page() {
     const emotions = [
         "楽しい", "寒い", "暑い", "悲しい", "眠い", "嬉しい", "疲れた", "びっくり", "怒り", "感謝"
     ];
@@ -68,7 +68,7 @@ export default function page() {
                                     left: "62%",
                                     transform: "translate(-50%, -50%)",
                                     fontSize: "24px",
-                                    color: "#1976d2",
+                                    color: "#040404ff",
                                     fontWeight: "bold",
                                     zIndex: 2,
                                     pointerEvents: "none",
