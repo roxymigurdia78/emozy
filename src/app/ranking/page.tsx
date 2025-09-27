@@ -28,6 +28,7 @@ export default function profile() {
       sparkles: 1,
     },
     // ...他の投稿
+    
   ];
     return (
         <div>
