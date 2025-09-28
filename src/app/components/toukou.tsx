@@ -8,8 +8,7 @@ export type Post = {
   userIconUrl: string; // ユーザーアイコン画像URL
   content: string; // 投稿内容
   imageUrl?: string; // 投稿画像（任意）
-  smiles: number; // 絵文字リアクション
-  sparkles: number;
+  reaction_id: string[];
 };
 
 export default function Toukou({ post }: { post: Post }) {
@@ -52,8 +51,9 @@ export default function Toukou({ post }: { post: Post }) {
         <img src={post.imageUrl} alt="post" style={{ width: "100%", borderRadius: "6px", marginTop: "8px" }} />
       )}
       <div style={{ marginTop: "10px", fontSize: "18px", display: "flex", gap: "16px" }}>
-        <span>😀 {post.smiles}</span>
-        <span>✨ {post.sparkles}</span>
+        {post.reaction_id.map((emoji, idx) => (
+          <span key={idx}>{emoji}</span>
+        ))}
       </div>
         <div style={{ position: "absolute", right: "13px", bottom: "8px", cursor: "pointer" }} onClick={() => setHearted(!hearted)}>
           <img
