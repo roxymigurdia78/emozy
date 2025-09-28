@@ -11,7 +11,7 @@ export default function page() {
             content: "ああ",
             imageUrl: "/images/title.png",
             emotions: [],
-            reaction_id: [],
+            reaction_ids: [],
         },
         {
             id: 2,
@@ -19,10 +19,9 @@ export default function page() {
             userIconUrl: "/images/title.png",
             content: "今日のぶどうは甘かったわー",
             emotions: [],
-            reaction_id: [],
+            reaction_ids: [],
         },
-
-    // ...他の投稿
+       
   ];
 
   return (
