@@ -4,6 +4,16 @@ import Link from "next/link";
 import Toukou from "../components/toukou";
 import type { Post } from "../components/toukou";
 import { useEffect, useState } from "react";
+
+type ApiPost = {
+    id: number;
+    user_id: number;
+    topic_id: number;
+    content: string;
+    image_url: string;
+    created_at: string;
+    updated_at: string;
+};
 export default function Home() {
 
     const [posts, setPosts] = useState<Post[]>([]);
@@ -12,7 +22,7 @@ export default function Home() {
                     .then(res => res.json())
                     .then(data => {
                         // Toukou用に変換
-                        const posts = data.map((item: any) => ({
+                        const posts = (data as ApiPost[]).map((item) => ({
                             id: item.id,
                             user: `user${item.user_id}`,
                             userIconUrl: "/images/title.png", // 仮アイコン
