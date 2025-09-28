@@ -9,6 +9,7 @@ export type Post = {
   content: string; // 投稿内容
   imageUrl?: string; // 投稿画像（任意）
   reaction_ids: string[];
+  reaction_counts?: number[]; // 各絵文字のリアクション数
 };
 
 export default function Toukou({ post }: { post: Post }) {
@@ -16,6 +17,10 @@ export default function Toukou({ post }: { post: Post }) {
   const [showMenu, setShowMenu] = useState(false);
   // 絵文字ボタンの押下状態（複数選択可）
   const [selectedIdx, setSelectedIdx] = useState<number[]>([]);
+  // 投稿ID（API用）
+  const postId = post.id;
+  // リアクション数のローカル状態（初期値はprops reaction_counts）
+  const [counts, setCounts] = useState<number[]>(post.reaction_counts || Array(post.reaction_ids.length).fill(1));
   return (
     <div style={{
       padding: "10px",
@@ -60,16 +65,39 @@ export default function Toukou({ post }: { post: Post }) {
           ];
           const emoji = emojiList[Number(id) - 1];
           const isSelected = selectedIdx.includes(idx);
+          // PUTリクエスト
+          const handleReaction = async () => {
+            const alreadySelected = selectedIdx.includes(idx);
+            setSelectedIdx(prev =>
+              alreadySelected
+                ? prev.filter(i => i !== idx)
+                : [...prev, idx]
+            );
+            try {
+              const payload = {
+                post: {
+                  user_id: 1, // 仮
+                  reaction_id: Number(id),
+                  increment: !alreadySelected
+                }
+              };
+              console.log("PUT送信内容", payload);
+              await fetch(`http://localhost:3333/api/v1/posts/${postId}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+              });
+              // 成功時にローカルのcountを+1/-1
+              setCounts(prev => prev.map((c, i) => i === idx ? c + (!alreadySelected ? 1 : -1) : c));
+            } catch (e) {
+              console.error("リアクション送信失敗", e);
+              alert("リアクション送信失敗");
+            }
+          };
           return (
             <button
               key={idx}
-              onClick={() => {
-                setSelectedIdx(prev =>
-                  prev.includes(idx)
-                    ? prev.filter(i => i !== idx)
-                    : [...prev, idx]
-                );
-              }}
+              onClick={handleReaction}
               style={{
                 background: isSelected ? "#7adad563" : "#EEEEEF",
                 border: "none",
@@ -87,7 +115,7 @@ export default function Toukou({ post }: { post: Post }) {
               }}
             >
               <span style={{ zIndex: 1 }}>{emoji}</span>
-              <span style={{ marginLeft: "18px" }}></span>
+              <span style={{ marginLeft: "7px", fontSize: "15px", color: "#333" }}>{counts[idx]}</span>
             </button>
           );
         })}
