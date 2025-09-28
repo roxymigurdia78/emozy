@@ -65,11 +65,17 @@ export default function PostPage() {
     };
 
     const postData = async () => {
+      type PostBody = {
+        user_id: number;
+        topic_id: number;
+        content?: string;
+        image?: string;
+      };
       let imageBase64 = "";
       if (postType === "photo" && photo) {
         imageBase64 = await toBase64(photo);
       }
-        const body: any = {
+        const body: PostBody = {
           user_id: 1, // 仮のユーザーID
           topic_id: 1, // 仮のトピックID
           content: postType === "text" ? text : text,
