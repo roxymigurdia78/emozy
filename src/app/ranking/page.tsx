@@ -10,21 +10,21 @@ export default function Page() {
     const [selectedEmotion, setSelectedEmotion] = useState("");
     const [showPopup, setShowPopup] = useState(false);
         const posts = [
-        {
+       {
             id: 1,
             user: "roxymigurdia78",
             userIconUrl: "/images/title.png",
             content: "ああ",
             imageUrl: "/images/title.png",
-            reaction_id: [],
-        },
-        {
+            reaction_ids: [],
+            },
+            {
             id: 2,
             user: "Saaaaa",
             userIconUrl: "/images/title.png",
             content: "今日のぶどうは甘かったわー",
-            reaction_id: [],
-        },
+            reaction_ids: [],
+            },
     // ...他の投稿
 
   ];
