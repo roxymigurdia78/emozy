@@ -17,8 +17,21 @@ export default function PostPage() {
   const [selectedEmotions, setSelectedEmotions] = useState<string[]>([]);
   const [isEmotionOpen, setIsEmotionOpen] = useState(false);
 
-  // 感情の候補（今後増減予定）
-  const emotions = ["😀", "😂", "😢", "😡", "😍", "😎"];
+  // 感情の候補（ID順）
+  const emotions = [
+    "😎", // 1
+    "😭", // 2
+    "😃", // 3
+    "😤", // 4
+    "🤣", // 5
+    "😩", // 6
+    "☹️", // 7
+    "😊", // 8
+    "😜", // 9
+    "😡", // 10
+    "😆", // 11
+    "😘", // 12
+  ];
 
   // 画像選択
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -48,7 +61,7 @@ export default function PostPage() {
       return;
     }
     if (selectedEmotions.length === 0) {
-      alert("感情を1つ以上選んでください");
+      alert("感情を1つ以上3つ以下で選んでください");
       return;
     }
 
@@ -70,15 +83,19 @@ export default function PostPage() {
         topic_id: number;
         content?: string;
         image?: string;
+        reaction_ids: number[];
       };
       let imageBase64 = "";
       if (postType === "photo" && photo) {
         imageBase64 = await toBase64(photo);
       }
+        // selectedEmotionsからreaction_idsを生成
+        const reaction_ids = selectedEmotions.map(e => emotions.indexOf(e) + 1);
         const body: PostBody = {
           user_id: 1, // 仮のユーザーID
           topic_id: 1, // 仮のトピックID
           content: postType === "text" ? text : text,
+          reaction_ids,
         };
         if (imageBase64) {
           body.image = imageBase64;

@@ -13,28 +13,47 @@ type ApiPost = {
     image_url: string;
     created_at: string;
     updated_at: string;
+    reaction_ids?: number[];
+    num_reactions?: { [id: string]: number };
 };
 export default function Home() {
 
     const [posts, setPosts] = useState<Post[]>([]);
-        useEffect(() => {
-                fetch("http://localhost:3333/api/v1/posts/")
-                    .then(res => res.json())
-                    .then(data => {
-                        // Toukou用に変換
-                        const posts = (data as ApiPost[]).map((item) => ({
-                            id: item.id,
-                            user: `user${item.user_id}`,
-                            userIconUrl: "/images/title.png", // 仮アイコン
-                            content: item.content,
-                            imageUrl: item.image_url,
-                            smiles: 0,
-                            sparkles: 0
-                        }));
-                        setPosts(posts);
-                    })
-                    .catch(err => console.error("投稿取得エラー", err));
-        }, []);
+    // 絵文字IDリスト（ID順）
+    const emotionsList = [
+        "😎", // 1
+        "😭", // 2
+        "😃", // 3
+        "😤", // 4
+        "🤣", // 5
+        "😩", // 6
+        "☹️", // 7
+        "😊", // 8
+        "😜", // 9
+        "😡", // 10
+        "😆", // 11
+        "😘", // 12
+    ];
+    useEffect(() => {
+        fetch("http://localhost:3333/api/v1/posts/")
+            .then(res => res.json())
+            .then(data => {
+                console.log("APIレスポンス:", data);
+                // Toukou用に変換
+                const posts = (data as ApiPost[]).map((item) => ({
+                    id: item.id,
+                    user: `user${item.user_id}`,
+                    userIconUrl: "/images/title.png", // 仮アイコン
+                    content: item.content,
+                    imageUrl: item.image_url,
+                    reaction_id: item.num_reactions
+                        ? Object.keys(item.num_reactions).map(id => emotionsList[Number(id) - 1])
+                        : [],
+                }));
+                setPosts(posts);
+            })
+            .catch(err => console.error("投稿取得エラー", err));
+    }, []);
 
   return (
     <div>
