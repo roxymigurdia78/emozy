@@ -7,8 +7,8 @@ export type Post = {
   user: string; // ユーザー名
   userIconUrl: string; // ユーザーアイコン画像URL
   content: string; // 投稿内容
-  imageUrl?: string; // 投稿画像（任意）
-  reaction_id: string[];
+  image: string; // 投稿画像（任意）
+  reaction_ids: string[];
 };
 
 export default function Toukou({ post }: { post: Post }) {
@@ -51,7 +51,7 @@ export default function Toukou({ post }: { post: Post }) {
         <img src={post.imageUrl} alt="post" style={{ width: "100%", borderRadius: "6px", marginTop: "8px" }} />
       )}
       <div style={{ marginTop: "10px", fontSize: "18px", display: "flex", gap: "16px" }}>
-        {post.reaction_id.map((emoji, idx) => (
+        {post.reaction_ids.map((emoji, idx) => (
           <span key={idx}>{emoji}</span>
         ))}
       </div>

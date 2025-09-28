@@ -13,7 +13,7 @@ type ApiPost = {
     image_url: string;
     created_at: string;
     updated_at: string;
-    reaction_ids?: number[];
+    reaction_ids: number[];
     num_reactions?: { [id: string]: number };
 };
 export default function Home() {
@@ -46,7 +46,7 @@ export default function Home() {
                     userIconUrl: "/images/title.png", // 仮アイコン
                     content: item.content,
                     imageUrl: item.image_url,
-                    reaction_id: item.num_reactions
+                    reaction_ids: item.num_reactions
                         ? Object.keys(item.num_reactions).map(id => emotionsList[Number(id) - 1])
                         : [],
                 }));

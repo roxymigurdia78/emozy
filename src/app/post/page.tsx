@@ -79,26 +79,27 @@ export default function PostPage() {
 
     const postData = async () => {
       type PostBody = {
+        "post":{
         user_id: number;
         topic_id: number;
-        content?: string;
+        content: string;
         image?: string;
         reaction_ids: number[];
-      };
+      }};
       let imageBase64 = "";
       if (postType === "photo" && photo) {
         imageBase64 = await toBase64(photo);
       }
         // selectedEmotionsからreaction_idsを生成
         const reaction_ids = selectedEmotions.map(e => emotions.indexOf(e) + 1);
-        const body: PostBody = {
+        const body: PostBody = { "post":{
           user_id: 1, // 仮のユーザーID
           topic_id: 1, // 仮のトピックID
           content: postType === "text" ? text : text,
           reaction_ids,
-        };
+        }};
         if (imageBase64) {
-          body.image = imageBase64;
+          body.post.image = imageBase64;
         }
       try {
       console.log("送信するJSON:", JSON.stringify(body));
