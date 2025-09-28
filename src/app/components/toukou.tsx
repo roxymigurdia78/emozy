@@ -8,7 +8,7 @@ export type Post = {
   userIconUrl: string; // ユーザーアイコン画像URL
   content: string; // 投稿内容
   imageUrl?: string; // 投稿画像（任意）
-  reaction_ids: string[];
+  reaction_ids: number[];
   reaction_counts?: number[]; // 各絵文字のリアクション数
 };
 
