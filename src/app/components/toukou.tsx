@@ -74,20 +74,19 @@ export default function Toukou({ post }: { post: Post }) {
                 : [...prev, idx]
             );
             try {
-              const payload = {
-                post: {
-                  user_id: 1, // 仮
+              const payload = { "post":{
+                  user_id: 1, 
                   reaction_id: Number(id),
                   increment: !alreadySelected
                 }
               };
-              console.log("PUT送信内容", payload);
+              console.log("PUT送信内容", JSON.stringify(payload));
               await fetch(`http://localhost:3333/api/v1/posts/${postId}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
               });
-              // 成功時にローカルのcountを+1/-1
+              
               setCounts(prev => prev.map((c, i) => i === idx ? c + (!alreadySelected ? 1 : -1) : c));
             } catch (e) {
               console.error("リアクション送信失敗", e);
