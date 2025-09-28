@@ -46,10 +46,12 @@ export default function Home() {
                     userIconUrl: "/images/title.png", // 仮アイコン
                     content: item.content,
                     imageUrl: item.image_url,
-                    reaction_ids: item.num_reactions
-                        ? Object.keys(item.num_reactions).map(id => emotionsList[Number(id) - 1])
-                        : [],
+                    // num_reactionsが空や0の場合は仮で[1,2,3]をセット
+                    reaction_ids: item.num_reactions && Object.keys(item.num_reactions).length > 0
+                        ? Object.keys(item.num_reactions).map(id => Number(id))
+                        : [1,2,3],
                 }));
+                console.log("Toukouに渡すposts:", posts);
                 setPosts(posts);
             })
             .catch(err => console.error("投稿取得エラー", err));

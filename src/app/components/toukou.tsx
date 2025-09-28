@@ -8,12 +8,19 @@ export type Post = {
   userIconUrl: string; // ユーザーアイコン画像URL
   content: string; // 投稿内容
   imageUrl?: string; // 投稿画像（任意）
-  reaction_ids: string[];
+  reaction_ids: number[];
+  reaction_counts?: number[]; // 各絵文字のリアクション数
 };
 
 export default function Toukou({ post }: { post: Post }) {
   const [hearted, setHearted] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  // 絵文字ボタンの押下状態（複数選択可）
+  const [selectedIdx, setSelectedIdx] = useState<number[]>([]);
+  // 投稿ID（API用）
+  const postId = post.id;
+  // リアクション数のローカル状態（初期値はprops reaction_counts）
+  const [counts, setCounts] = useState<number[]>(post.reaction_counts || Array(post.reaction_ids.length).fill(1));
   return (
     <div style={{
       padding: "10px",
@@ -50,10 +57,67 @@ export default function Toukou({ post }: { post: Post }) {
       {post.imageUrl && (
         <img src={post.imageUrl} alt="post" style={{ width: "100%", borderRadius: "6px", marginTop: "8px" }} />
       )}
-      <div style={{ marginTop: "10px", fontSize: "18px", display: "flex", gap: "16px" }}>
-        {post.reaction_ids.map((emoji, idx) => (
-          <span key={idx}>{emoji}</span>
-        ))}
+  <div style={{ marginTop: "6px", fontSize: "18px", display: "flex", gap: "16px" }}>
+        {post.reaction_ids?.map((id, idx) => {
+          // 絵文字ID→絵文字変換
+          const emojiList = [
+            "😎", "😭", "😃", "😤", "🤣", "😩", "☹️", "😊", "😜", "😡", "😆", "😘"
+          ];
+          const emoji = emojiList[Number(id) - 1];
+          const isSelected = selectedIdx.includes(idx);
+          // PUTリクエスト
+          const handleReaction = async () => {
+            const alreadySelected = selectedIdx.includes(idx);
+            // トグル: 押してなければ+1, 押してたら-1
+            setSelectedIdx(prev =>
+              alreadySelected
+                ? prev.filter(i => i !== idx)
+                : [...prev, idx]
+            );
+            try {
+              await fetch(`http://localhost:3333/api/v1/posts/${postId}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  "post": {
+                    user_id: 1, // 仮
+                    reaction_id: Number(id),
+                    increment: !alreadySelected
+                  }
+                })
+              });
+              // 成功時にローカルのcountを+1/-1
+              setCounts(prev => prev.map((c, i) => i === idx ? c + (!alreadySelected ? 1 : -1) : c));
+            } catch (e) {
+              console.error("リアクション送信失敗", e);
+              alert("リアクション送信失敗");
+            }
+          };
+          return (
+            <button
+              key={idx}
+              onClick={handleReaction}
+              style={{
+                background: isSelected ? "#7adad563" : "#EEEEEF",
+                border: "none",
+                borderRadius: "10px",
+                width: "60px",
+                height: "30px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "flex-start",
+                fontSize: "22px",
+                cursor: "pointer",
+                transition: "background 0.2s",
+                paddingLeft: "8px",
+                marginRight: "-10px"
+              }}
+            >
+              <span style={{ zIndex: 1 }}>{emoji}</span>
+              <span style={{ marginLeft: "7px", fontSize: "15px", color: "#333" }}>{counts[idx]}</span>
+            </button>
+          );
+        })}
       </div>
         <div style={{ position: "absolute", right: "13px", bottom: "8px", cursor: "pointer" }} onClick={() => setHearted(!hearted)}>
           <img
