@@ -4,7 +4,7 @@ import Link from "next/link";
 import Toukou from "../components/toukou";
 import type { Post } from "../components/toukou";
 import { useEffect, useState } from "react";
-export default function page() {
+export default function Home() {
 
     const [posts, setPosts] = useState<Post[]>([]);
         useEffect(() => {
