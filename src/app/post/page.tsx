@@ -52,16 +52,56 @@ export default function PostPage() {
       return;
     }
 
-    // ここでAPIに送信する処理を入れる予定
-    console.log({
-      type: postType,
-      text,
-      photo,
-      emotions: selectedEmotions,
-    });
+    // 画像をbase64化する関数
+    const toBase64 = (file: File): Promise<string> => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          resolve(reader.result as string);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    };
 
-    // 投稿完了後に /home へ移動
-    router.push("/home");
+    const postData = async () => {
+      type PostBody = {
+        user_id: number;
+        topic_id: number;
+        content?: string;
+        image?: string;
+      };
+      let imageBase64 = "";
+      if (postType === "photo" && photo) {
+        imageBase64 = await toBase64(photo);
+      }
+        const body: PostBody = {
+          user_id: 1, // 仮のユーザーID
+          topic_id: 1, // 仮のトピックID
+          content: postType === "text" ? text : text,
+        };
+        if (imageBase64) {
+          body.image = imageBase64;
+        }
+      try {
+      console.log("送信するJSON:", JSON.stringify(body));
+      const res = await fetch("http://localhost:3333/api/v1/posts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+        if (!res.ok) {
+          throw new Error("投稿失敗");
+        }
+        router.push("/home");
+      } catch (err) {
+        alert("投稿に失敗しました");
+        console.error(err);
+      }
+    };
+    postData();
   };
 
   return(
