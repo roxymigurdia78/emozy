@@ -2,7 +2,7 @@
 import Image from "next/image";
 import { useState } from "react";
 
-type Post = {
+export type Post = {
   id: number;
   user: string; // ユーザー名
   userIconUrl: string; // ユーザーアイコン画像URL

@@ -1,28 +1,40 @@
+"use client";
 import Image from "next/image";
 import Link from "next/link";
 import Toukou from "../components/toukou";
-export default function page() {
+import type { Post } from "../components/toukou";
+import { useEffect, useState } from "react";
 
-    const posts = [
-    {
-      id: 1,
-      user: "roxymigurdia78",
-      userIconUrl: "/images/title.png",
-      content: "ああ",
-      imageUrl: "/images/title.png",
-      smiles: 5,
-      sparkles: 2,
-    },
-    {
-      id: 2,
-      user: "Saaaaa",
-      userIconUrl: "/images/title.png",
-      content: "今日のぶどうは甘かったわー",
-      smiles: 3,
-      sparkles: 1,
-    },
-    // ...他の投稿
-  ];
+type ApiPost = {
+    id: number;
+    user_id: number;
+    topic_id: number;
+    content: string;
+    image_url: string;
+    created_at: string;
+    updated_at: string;
+};
+export default function Home() {
+
+    const [posts, setPosts] = useState<Post[]>([]);
+        useEffect(() => {
+                fetch("http://localhost:3333/api/v1/posts/")
+                    .then(res => res.json())
+                    .then(data => {
+                        // Toukou用に変換
+                        const posts = (data as ApiPost[]).map((item) => ({
+                            id: item.id,
+                            user: `user${item.user_id}`,
+                            userIconUrl: "/images/title.png", // 仮アイコン
+                            content: item.content,
+                            imageUrl: item.image_url,
+                            smiles: 0,
+                            sparkles: 0
+                        }));
+                        setPosts(posts);
+                    })
+                    .catch(err => console.error("投稿取得エラー", err));
+        }, []);
 
   return (
     <div>
@@ -50,9 +62,13 @@ export default function page() {
 
 
     <main style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: "0" }}>
-        {posts.map((post) => (
-                    <Toukou key={post.id} post={post} />
-        ))}
+        {posts.length === 0 ? (
+            <div style={{ color: "#888", marginTop: "32px" }}>現在は投稿が無く、さみしい感じですね、、、、。</div>
+        ) : (
+            posts.map((post) => (
+                <Toukou key={post.id} post={post} />
+            ))
+        )}
       </main>
 
 
