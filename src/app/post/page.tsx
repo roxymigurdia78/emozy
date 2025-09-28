@@ -69,7 +69,7 @@ export default function PostPage() {
         <header className={styles.header1}>
             <Link href="/home">
             <Image
-                src="/images/title.png"
+                src="/images/emozy_logo.png"
                 alt="title"
                 width={150}
                 height={150}

@@ -76,7 +76,6 @@ const emotionMap: Record<string, string> = {
 };
 
 export default function SearchPage() {
-  const router = useRouter();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Post[]>([]);
   const [page, setPage] = useState(1);
@@ -143,7 +142,7 @@ export default function SearchPage() {
       >
         <Link href="/home">
           <Image
-            src="/images/title.png"
+            src="/images/emozy_logo.png"
             alt="title"
             width={150}
             height={150}
@@ -195,6 +194,9 @@ export default function SearchPage() {
             </ul>
           )}
         </div>
+
+
+
         <button
           onClick={handleSearch}
           style={{ marginLeft: "8px", padding: "8px 12px" }}
@@ -266,34 +268,63 @@ export default function SearchPage() {
       </main>
 
       {/* フッター */}
-      <footer
-        style={{
-          backgroundColor: "#7ADAD5",
-          height: "100px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          position: "fixed",
-          bottom: "0",
-          width: "100%",
-        }}
-      >
-        <Link href="/home">
-          <Image src="/images/mitei.png" alt="homeicon" width={50} height={50} />
-        </Link>
-        <Link href="/ranking">
-          <Image src="/images/mitei.png" alt="rankingicon" width={50} height={50} />
-        </Link>
-        <Link href="/post">
-          <Image src="/images/mitei.png" alt="posticon" width={50} height={50} />
-        </Link>
-        <Link href="/search">
-          <Image src="/images/mitei.png" alt="searchicon" width={50} height={50} />
-        </Link>
-        <Link href="/profile">
-          <Image src="/images/mitei.png" alt="profileicon" width={50} height={50} />
-        </Link>
-      </footer>
+          <footer style={{
+        backgroundColor: "#f3f2f2ac",
+        height: "75px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        position: "fixed",
+        bottom: "0",
+        width: "100%",
+        padding: "0 32px"
+    }}>
+    <Link href="/home" style={{ display: "flex", alignItems: "flex-end", height: "100px", flexShrink: 0, flexGrow: 0 }}>
+        <Image
+            src="/images/homeicon.png"
+            alt="homeicon"
+            width={60}
+            height={60}
+            style={{ marginLeft: "-30px", marginTop: "10px", marginBottom: "15px", marginRight: "3px", minWidth: "65px", minHeight: "65px" }}
+        />
+    </Link>
+    <Link href="/ranking" style={{ display: "flex", alignItems: "flex-end", height: "100px", flexShrink: 0, flexGrow: 0 }}>
+        <Image
+            src="/images/rankingicon.png"
+            alt="rankingicon"
+            width={60}
+            height={60}
+            style={{ marginLeft: "0px", marginTop: "10px", marginBottom: "15px", marginRight: "0px", minWidth: "65px", minHeight: "65px" }}
+        />
+    </Link>
+    <Link href="post" style={{ display: "flex", alignItems: "flex-end", height: "100px", flexShrink: 0, flexGrow: 0 }}>
+        <Image
+            src="/images/toukouicon.png"
+            alt="posticon"
+            width={60}
+            height={60}
+            style={{ marginLeft: "0px", marginTop: "10px", marginBottom: "19px", marginRight: "0px", minWidth: "65px", minHeight: "65px" }}
+        />
+    </Link>
+    <Link href="/search" style={{ display: "flex", alignItems: "flex-end", height: "100px", flexShrink: 0, flexGrow: 0 }}>
+        <Image
+            src="/images/searchicon.png"
+            alt="searchicon"
+            width={60}
+            height={60}
+            style={{ marginLeft: "0px", marginTop: "10px", marginBottom: "22px", marginRight: "-5px", minWidth: "65px", minHeight: "65px" }}
+        />
+    </Link>
+    <Link href="/profile" style={{ display: "flex", alignItems: "flex-end", height: "100px", flexShrink: 0, flexGrow: 0 }}>
+        <Image
+            src="/images/toukouicon.png"
+            alt="profileicon"
+            width={60}
+            height={60}
+            style={{ marginLeft: "-8px", marginTop: "10px", marginBottom: "19px", marginRight: "-24px", minWidth: "65px", minHeight: "65px" }}
+        />
+    </Link>
+    </footer>
     </div>
   );
 }
