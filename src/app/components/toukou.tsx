@@ -7,7 +7,7 @@ export type Post = {
   user: string; // ユーザー名
   userIconUrl: string; // ユーザーアイコン画像URL
   content: string; // 投稿内容
-  image: string; // 投稿画像（任意）
+  imageUrl?: string; // 投稿画像（任意）
   reaction_ids: string[];
 };
 
