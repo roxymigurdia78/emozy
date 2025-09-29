@@ -40,17 +40,19 @@ export default function Home() {
             .then(data => {
                 console.log("APIレスポンス:", data);
                 // Toukou用に変換
-                const posts = (data as ApiPost[]).map((item) => ({
-                    id: item.id,
-                    user: `user${item.user_id}`,
-                    userIconUrl: "/images/title.png", // 仮アイコン
-                    content: item.content,
-                    imageUrl: item.image_url,
-                    // num_reactionsが空や0の場合は仮で[1,2,3]をセット
-                    reaction_ids: item.num_reactions && Object.keys(item.num_reactions).length > 0
-                        ? Object.keys(item.num_reactions).map(id => Number(id))
-                        : [1,2,3],
-                }));
+                const posts = (data as ApiPost[]).map((item) => {
+                    const reaction_ids = item.num_reactions ? Object.keys(item.num_reactions).map(id => Number(id)) : [1,2,3];
+                    const reaction_counts = item.num_reactions ? Object.values(item.num_reactions) : [0,0,0];
+                    return {
+                        id: item.id,
+                        user: `user${item.user_id}`,
+                        userIconUrl: "/images/title.png", // 仮アイコン
+                        content: item.content,
+                        imageUrl: item.image_url,
+                        reaction_ids,
+                        reaction_counts,
+                    };
+                });
                 console.log("Toukouに渡すposts:", posts);
                 setPosts(posts);
             })
