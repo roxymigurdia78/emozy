@@ -10,7 +10,7 @@ export default function SignUpPage() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
+ 
 
   const [message, setMessage] = useState("");
 
@@ -23,14 +23,10 @@ export default function SignUpPage() {
       alert("パスワードを入力してください");
       return;
     }
-    if (!name.trim()) {
-      alert("名前を入力してください");
-      return;
-    }
+    
 
     const body = {
       signup: {
-        name,
         email,
         password,
       }
@@ -54,7 +50,7 @@ export default function SignUpPage() {
   };
 
   const isFormValid =
-    name.trim() !== "" && email.trim() !== "";
+    email.trim() !== "" && password.trim() !== "";
 
   return (
     <div
@@ -99,14 +95,7 @@ export default function SignUpPage() {
               focus:border-[#7ADAD5] focus:ring-2 focus:ring-[#7ADAD5]/60 outline-none transition"
           />
           
-          <input
-            type="name"
-            placeholder="名前"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full p-3 rounded-lg bg-white/70 focus:bg-white border border-gray-200 
-              focus:border-[#7ADAD5] focus:ring-2 focus:ring-[#7ADAD5]/60 outline-none transition"
-          />
+         
           
 
           <button
