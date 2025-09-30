@@ -8,8 +8,10 @@ import { useRouter } from "next/navigation";
 export default function SignUpPage() {
   const router = useRouter();
 
-  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+
   const [message, setMessage] = useState("");
 
   const handleSignUp = async () => {
@@ -17,19 +19,38 @@ export default function SignUpPage() {
       alert("メールアドレスを入力して下さい。");
       return;
     }
+    if (!password.trim()) {
+      alert("パスワードを入力してください");
+      return;
+    }
     if (!name.trim()) {
-      alert("名前を入力して下さい。");
+      alert("名前を入力してください");
       return;
     }
 
-    const signupData = { name, email };
-    console.log("送信予定のデータ:", signupData);
-
-    // 仮メッセージ（バックエンド接続後は削除可）
-    setMessage("登録用メールを送信しました！");
-
-    // ✅ 登録後に /make に移動
-    router.push("/make");
+    const body = {
+      signup: {
+        name,
+        email,
+        password,
+      }
+    };
+    console.log("送信JSON:", body);
+    try {
+      const res = await fetch("http://localhost:3333/api/v1/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      if (!res.ok) {
+        throw new Error("登録失敗");
+      }
+      setMessage("登録が完了しました！");
+      router.push("/make");
+    } catch (e) {
+      setMessage("登録に失敗しました");
+      console.error(e);
+    }
   };
 
   const isFormValid =
@@ -57,23 +78,32 @@ export default function SignUpPage() {
 
         {/* サインアップフォーム */}
         <h1 className="text-2xl font-bold text-center text-white mb-6">
-          サイン アップ
+          サインアップ
         </h1>
 
         <div className="flex flex-col space-y-5">
-          <input
-            type="text"
-            placeholder="名前"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full p-3 rounded-lg bg-white/70 focus:bg-white border border-gray-200 
-              focus:border-[#7ADAD5] focus:ring-2 focus:ring-[#7ADAD5]/60 outline-none transition"
-          />
           <input
             type="email"
             placeholder="メールアドレス"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            className="w-full p-3 rounded-lg bg-white/70 focus:bg-white border border-gray-200 
+              focus:border-[#7ADAD5] focus:ring-2 focus:ring-[#7ADAD5]/60 outline-none transition"
+          />
+          <input
+            type="password"
+            placeholder="パスワード"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full p-3 rounded-lg bg-white/70 focus:bg-white border border-gray-200 
+              focus:border-[#7ADAD5] focus:ring-2 focus:ring-[#7ADAD5]/60 outline-none transition"
+          />
+          
+          <input
+            type="name"
+            placeholder="名前"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
             className="w-full p-3 rounded-lg bg-white/70 focus:bg-white border border-gray-200 
               focus:border-[#7ADAD5] focus:ring-2 focus:ring-[#7ADAD5]/60 outline-none transition"
           />
