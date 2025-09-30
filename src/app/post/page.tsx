@@ -123,118 +123,145 @@ export default function PostPage() {
   };
 
   return(
-    <>
-        <header className={styles.header1}>
-            <Link href="/home">
-            <Image
-                src="/images/emozy_logo.png"
-                alt="title"
-                width={150}
-                height={150}
-                className={styles.logo}
-            />
-            </Link>
-        </header>
-    
-    <div className={styles.container}>
+    <div className="min-h-screen bg-gradient-to-br from-[#7ADAD5] to-[#89CFF0] flex flex-col justify-center items-center">
+      {/* ヘッダー */}
+      <header className="w-full flex justify-center py-6">
+        <Link href="/home">
+          <Image
+            src="/images/emozy_logo.png"
+            alt="title"
+            width={150}
+            height={150}
+            className="hover:scale-105 transition-transform"
+          />
+        </Link>
+      </header>
+
+      {/* 投稿カード */}
+      <div className="bg-white shadow-lg rounded-2xl p-6 w-full max-w-md mx-auto">
         {/* 上部バー */}
-        <div className="styles.header">
-            <button onClick={() => router.push("/home")} className="text-xl">
-                ×
-            </button>
-            <h1 className="text-lg font-bold">新規投稿</h1>
+        <div className="relative mb-4 flex items-center justify-center">
+          <button
+            onClick={() => router.push("/home")}
+            className="absolute left-0 text-2xl font-bold text-gray-500 hover:text-gray-800"
+          >
+            ×
+          </button>
+          <h1 className="text-lg font-bold">新規投稿</h1>
         </div>
 
         {/* 投稿タイプ選択 */}
         <div className="my-4 flex gap-4">
-            <button
-                className={`${styles.typeButton} ${
-                    postType === "text" ? styles.typeButtonActive : ""
-                }`}
-                onClick={() => {
-                    setPostType("text");
-                    setPhoto(null);
-                    setPreview(null);
-                }}
-            >
-                テキスト
-            </button>
-            <button
-                className={`${styles.typeButton} ${
-                    postType === "photo" ? styles.typeButtonActive : ""
-                }`}
-                onClick={() => {
-                    setPostType("photo");
-                    setText("");
-                }}
-            >
-                写真
-            </button>
+          <button
+            className={`flex-1 py-2 rounded-lg font-semibold transition ${
+              postType === "text"
+                ? "bg-[#7ADAD5] text-white shadow-md"
+                : "bg-gray-100 hover:bg-gray-200"
+            }`}
+            onClick={() => {
+              setPostType("text");
+              setPhoto(null);
+              setPreview(null);
+            }}
+          >
+            テキスト
+          </button>
+          <button
+            className={`flex-1 py-2 rounded-lg font-semibold transition ${
+              postType === "photo"
+                ? "bg-[#7ADAD5] text-white shadow-md"
+                : "bg-gray-100 hover:bg-gray-200"
+            }`}
+            onClick={() => {
+              setPostType("photo");
+              setText("");
+            }}
+          >
+            写真
+          </button>
         </div>
 
         {/* 投稿内容 */}
         {postType === "text" && (
-            <textarea
-                className="w-full border p-2"
-                rows={5}
-                placeholder="ここに入力"
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-            />
+          <textarea
+            className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-[#7ADAD5] focus:outline-none"
+            rows={5}
+            placeholder="ここに入力..."
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+          />
         )}
 
         {postType === "photo" && (
-            <div>
-                <label className={styles.fileLabel}>
-                    写真を選択
-                    <input 
-                        type="file" 
-                        accept="image/*" 
-                        onChange={handleFileChange}
-                        className = {styles.fileInput}
-                    />
-                </label>
-        {preview ? 
-          (<Image src={preview} alt="preview" width={192} height={192} className="mt-2 w-48 rounded" />)
-          : 
-          (<p className={styles.noFile}>写真が選択されていません</p>
-                )}
-            </div>
-            
+          <div>
+            <label className="block text-center py-3 border rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
+              写真を選択
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+            </label>
+            {preview ? (
+              <img
+                src={preview}
+                alt="preview"
+                className="mt-3 w-full rounded-lg shadow-md"
+              />
+            ) : (
+              <p className="text-center text-sm text-gray-500 mt-2">
+                写真が選択されていません
+              </p>
+            )}
+          </div>
         )}
 
-      {/* 感情選択 */}
-      <div className="mt-6">
-        <p>入れたい感情を1〜3つ入れてください</p>
-        <div className="flex items-center gap-2 mt-2">
-          {selectedEmotions.map((e) => (
-            <span key={e} className="text-2xl">
-              {e}
-            </span>
-          ))}
-          <button
-            onClick={() => setIsEmotionOpen(true)}
-            className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xl"
-          >
-            +
-          </button>
+        {/* 感情選択 */}
+        <div className="mt-6">
+          <p className="text-sm text-gray-600">
+            入れたい感情を1〜3つ選んでください
+          </p>
+          <div className="flex items-center gap-2 mt-2">
+            {selectedEmotions.map((e) => (
+              <span key={e} className="text-2xl">
+                {e}
+              </span>
+            ))}
+            <button
+              onClick={() => setIsEmotionOpen(true)}
+              className="w-8 h-8 rounded-full bg-[#7ADAD5] text-white flex items-center justify-center hover:scale-105 transition"
+            >
+              +
+            </button>
+          </div>
         </div>
+
+        {/* 投稿ボタン */}
+        <button
+          onClick={handleSubmit}
+          className="mt-6 w-full bg-gradient-to-r from-[#7ADAD5] to-[#5CCCCC] text-white py-3 rounded-lg font-bold shadow-md hover:opacity-90 transition"
+        >
+          シェアする
+        </button>
       </div>
 
       {/* 感情選択ポップアップ */}
       {isEmotionOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-30 flex justify-center items-center">
-          <div className="bg-white p-4 rounded shadow-lg">
-            <h2 className="mb-2">感情を選択（最大3つ）</h2>
-            <div className="flex flex-wrap gap-2">
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center">
+          <div className="bg-white p-6 rounded-xl shadow-lg max-w-sm w-full">
+            <h2 className="mb-3 text-lg font-semibold text-center">
+              感情を選択（最大3つ）
+            </h2>
+            <div className="flex flex-wrap gap-3 justify-center">
               {emotions.map((e) => (
                 <button
                   key={e}
                   onClick={() => toggleSelectEmotion(e)}
-                  className={`text-2xl p-2 rounded ${
+                  className={`text-3xl p-3 rounded-lg transition ${
                     selectedEmotions.includes(e)
-                      ? "bg-blue-200"
-                      : "bg-gray-100"
+                      ? "bg-[#7ADAD5] text-white"
+                      : "bg-gray-100 hover:bg-gray-200"
                   }`}
                 >
                   {e}
@@ -242,7 +269,7 @@ export default function PostPage() {
               ))}
             </div>
             <button
-              className="mt-4 px-4 py-2 bg-blue-500 text-white rounded"
+              className="mt-5 w-full py-2 bg-[#7ADAD5] text-white rounded-lg font-bold hover:opacity-90 transition"
               onClick={() => setIsEmotionOpen(false)}
             >
               決定
@@ -250,15 +277,6 @@ export default function PostPage() {
           </div>
         </div>
       )}
-
-      {/* 投稿ボタン */}
-      <button
-        onClick={handleSubmit}
-        className="mt-6 w-full bg-blue-500 text-white py-2 rounded"
-      >
-        シェアする
-      </button>
     </div>
-    </>
   );
 }

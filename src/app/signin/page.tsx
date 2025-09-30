@@ -2,14 +2,19 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     console.log("ログイン:", { email, password });
+
+    // 仮のログイン成功処理
+    router.push("/home"); // ログイン後に /home へ遷移
   };
 
   const isFormValid = email.trim() !== "" && password.trim() !== "";
@@ -63,15 +68,14 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* サインアップリンク */}
+        {/* サインアップ遷移 */}
         <div className="mt-6 text-center text-sm text-white/90">
-          <p style = {{color:'black'}}>アカウントをお持ちでないですか？</p>
-          <a
-            href="/signup"
-            className="font-medium underline underline-offset-2 hover:text-yellow-200 transition"
+          <p
+            className="text-white cursor-pointer font-medium underline underline-offset-2 hover:text-yellow-200 transition"
+            onClick={() => router.push("/signup")}
           >
-            登録する
-          </a>
+            アカウントをお持ちでないですか？
+          </p>
         </div>
       </div>
     </div>
