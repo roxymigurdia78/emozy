@@ -46,7 +46,9 @@ export default function MakeProfilePage() {
                 {/* Profile creation form */}
                 <div style={styles.formContainer}>
                     <h1 style={styles.title}>
-                        Create Your Profile
+                       プロフィールを
+                       <br></br>
+                       作ってみよう！
                     </h1>
 
                     <form onSubmit={(e) => { e.preventDefault(); handleComplete(); }}>
@@ -59,12 +61,12 @@ export default function MakeProfilePage() {
                                 value={userId}
                                 onChange={(e) => setUserId(e.target.value)}
                                 style={styles.input}
-                                placeholder="e.g. emozy_user_123"
+                               
                             />
                         </div>
 
                         <div style={styles.inputGroup}>
-                            <label htmlFor="userName" style={styles.label}>Name</label>
+                            <label htmlFor="userName" style={styles.label}>名前</label>
                             <input
                                 type="text"
                                 id="userName"
@@ -72,19 +74,19 @@ export default function MakeProfilePage() {
                                 value={userName}
                                 onChange={(e) => setUserName(e.target.value)}
                                 style={styles.input}
-                                placeholder="e.g. Emozy Taro"
+                                
                             />
                         </div>
 
                         <div style={styles.inputGroup}>
-                            <label htmlFor="profile" style={styles.label}>Profile</label>
+                            <label htmlFor="profile" style={styles.label}>プロフィール</label>
                             <textarea
                                 id="profile"
                                 className="form-input"
                                 value={profile}
                                 onChange={(e) => setProfile(e.target.value)}
                                 style={{ ...styles.input, height: '120px', resize: 'vertical' }}
-                                placeholder="Hello! I'm new here."
+                                
                             />
                         </div>
 
@@ -93,7 +95,7 @@ export default function MakeProfilePage() {
                             className="form-button"
                             style={styles.button}
                         >
-                            Complete
+                            さあ、はじめよう！
                         </button>
                     </form>
                 </div>
