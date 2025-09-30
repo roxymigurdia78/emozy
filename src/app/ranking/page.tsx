@@ -47,14 +47,16 @@ export default function Page() {
         const emotionId = emotions.indexOf(emotion) + 1;
         try {
             const body = {
-                ranking: { topic_id: 2, reaction_id: emotionId, limit: 50 }
+                ranking: {  reaction_id: emotionId, limit: 50 }
             };
+            console.log("送信JSON:", body);
             const res = await fetch("http://localhost:3333/api/v1/ranking", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(body)
             });
             const data = await res.json();
+            console.log("POSTレスポンス:", data);
             // Toukou用データに変換（/homeのロジック流用）
             const posts = Array.isArray(data) ? data.map((item: any) => {
                 const reaction_ids = item.num_reactions ? Object.keys(item.num_reactions).map(id => Number(id)) : [1,2,3];
@@ -149,6 +151,7 @@ export default function Page() {
                 )}
             </main>
             
+
 
     <footer style={{
         backgroundColor: "#f3f2f2ac",
