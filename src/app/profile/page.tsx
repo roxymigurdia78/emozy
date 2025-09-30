@@ -53,6 +53,7 @@ export default function page() {
                         <span>フォロワー <b>456</b></span>
                     </div>
                 </div>
+                
             </div>
             {/* プロフィール（自己紹介文）追加 */}
             <div style={{ paddingLeft: "23px", paddingRight: "24px", marginBottom: "10px", color: "#333", fontSize: "17px" }}>

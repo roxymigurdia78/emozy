@@ -3,31 +3,77 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import Toukou from "../components/toukou";
+import { useEffect } from "react";
 export default function Page() {
+    // 初期表示で全ランキング取得
+    useEffect(() => {
+        const fetchRanking = async () => {
+            try {
+                const res = await fetch("http://localhost:3333/api/v1/ranking");
+                const data = await res.json();
+                const posts = Array.isArray(data) ? data.map((item: any) => {
+                    const reaction_ids = item.num_reactions ? Object.keys(item.num_reactions).map(id => Number(id)) : [1,2,3];
+                    const reaction_counts = item.num_reactions ? Object.values(item.num_reactions) : [0,0,0];
+                    return {
+                        id: item.id,
+                        user: `user${item.user_id}`,
+                        userIconUrl: "/images/title.png",
+                        content: item.content,
+                        imageUrl: item.image_url,
+                        reaction_ids,
+                        reaction_counts,
+                    };
+                }) : [];
+                setPosts(posts);
+            } catch (e) {
+                console.error("ランキング取得失敗", e);
+                setPosts([]);
+            }
+        };
+        fetchRanking();
+    }, []);
     const emotions = [
-        "楽しい", "寒い", "暑い", "悲しい", "眠い", "嬉しい", "疲れた", "びっくり", "怒り", "感謝"
+        "😎", "😭", "😃", "😤", "🤣", "😩", "☹️", "😊", "😜", "😡", "😆", "😘"
     ];
     const [selectedEmotion, setSelectedEmotion] = useState("");
     const [showPopup, setShowPopup] = useState(false);
-        const posts = [
-       {
-            id: 1,
-            user: "roxymigurdia78",
-            userIconUrl: "/images/title.png",
-            content: "ああ",
-            imageUrl: "/images/title.png",
-            reaction_ids: [],
-            },
-            {
-            id: 2,
-            user: "Saaaaa",
-            userIconUrl: "/images/title.png",
-            content: "今日のぶどうは甘かったわー",
-            reaction_ids: [],
-            },
-    // ...他の投稿
+    const [posts, setPosts] = useState<any[]>([]);
 
-  ];
+    // 絵文字選択時にAPIから投稿取得（POST）
+    const handleEmotionSelect = async (emotion: string) => {
+        setSelectedEmotion(emotion);
+        setShowPopup(false);
+        const emotionId = emotions.indexOf(emotion) + 1;
+        try {
+            const body = {
+                ranking: { topic_id: 2, reaction_id: emotionId, limit: 50 }
+            };
+            const res = await fetch("http://localhost:3333/api/v1/ranking", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body)
+            });
+            const data = await res.json();
+            // Toukou用データに変換（/homeのロジック流用）
+            const posts = Array.isArray(data) ? data.map((item: any) => {
+                const reaction_ids = item.num_reactions ? Object.keys(item.num_reactions).map(id => Number(id)) : [1,2,3];
+                const reaction_counts = item.num_reactions ? Object.values(item.num_reactions) : [0,0,0];
+                return {
+                    id: item.id,
+                    user: `user${item.user_id}`,
+                    userIconUrl: "/images/title.png", // 仮アイコン
+                    content: item.content,
+                    imageUrl: item.image_url,
+                    reaction_ids,
+                    reaction_counts,
+                };
+            }) : [];
+            setPosts(posts);
+        } catch (e) {
+            console.error("ランキング取得失敗", e);
+            setPosts([]);
+        }
+    };
     return (
         <div>
             <header style={{
@@ -81,7 +127,7 @@ export default function Page() {
                                         <button
                                             key={emotion}
                                             style={{ padding: "6px 16px", borderRadius: "20px", border: selectedEmotion === emotion ? "2px solid #7ADAD5" : "1px solid #ccc", background: selectedEmotion === emotion ? "#e0f7fa" : "#fff", fontSize: "16px", cursor: "pointer" }}
-                                            onClick={() => { setSelectedEmotion(emotion); setShowPopup(false); }}
+                                            onClick={() => handleEmotionSelect(emotion)}
                                         >{emotion}</button>
                                     ))}
                                 </div>
@@ -93,10 +139,14 @@ export default function Page() {
             </header>
 
             <main style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: "0" }}>
-                    {posts.map((post) => (
-                                <Toukou key={post.id} post={post} />
-                    ))}
-                  </main>
+                {posts.length === 0 ? (
+                    <div style={{ color: "#888", marginTop: "32px" }}>絵文字を選択してください。</div>
+                ) : (
+                    posts.map((post, index) => (
+                        <Toukou key={`${post.id}-${index}`} post={post} />
+                    ))
+                )}
+            </main>
             
 
     <footer style={{
