@@ -20,7 +20,7 @@ export default function Toukou({ post }: { post: Post }) {
   // 投稿ID（API用）
   const postId = post.id;
   // リアクション数のローカル状態（初期値はprops reaction_counts）
-  const [counts, setCounts] = useState<number[]>(post.reaction_counts || Array(post.reaction_ids.length).fill(1));
+  const counts = post.reaction_counts || Array(post.reaction_ids.length).fill(1);
   return (
     <div style={{
       padding: "10px",
@@ -39,7 +39,7 @@ export default function Toukou({ post }: { post: Post }) {
           style={{ borderRadius: "50%", marginRight: "10px" }}
         />
         <span style={{ fontWeight: "bold", fontSize: "16px" }}>{post.user}</span>
-        <img
+        <Image
           src="/images/3ten.png"
           alt="3ten"
           width={24}
@@ -55,7 +55,7 @@ export default function Toukou({ post }: { post: Post }) {
       </div>
       <p style={{ fontSize: "15px", margin: "8px 0" }}>{post.content}</p>
       {post.imageUrl && (
-        <img src={post.imageUrl} alt="post" style={{ width: "100%", borderRadius: "6px", marginTop: "8px" }} />
+        <Image src={post.imageUrl} alt="post" width={400} height={300} style={{ width: "100%", borderRadius: "6px", marginTop: "8px" }} />
       )}
   <div style={{ marginTop: "6px", fontSize: "18px", display: "flex", gap: "16px" }}>
         {post.reaction_ids?.map((id, idx) => {
@@ -121,7 +121,7 @@ export default function Toukou({ post }: { post: Post }) {
         })}
       </div>
         <div style={{ position: "absolute", right: "13px", bottom: "8px", cursor: "pointer" }} onClick={() => setHearted(!hearted)}>
-          <img
+          <Image
             src="/images/heart.png"
             alt="heart"
             width={28}

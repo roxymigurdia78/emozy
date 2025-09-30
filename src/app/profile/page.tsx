@@ -28,7 +28,7 @@ export default function page() {
     <div>
                         <div style={{ width: "100%", padding: "24px 0 8px 24px", fontWeight: "bold", fontSize: "30px", color: "#222", position: "relative" }}>
                     roxymigurdia78
-                                <img
+                                <Image
                                     src="/images/settei.png"
                                     alt="settings"
                                     width={36}
@@ -53,6 +53,7 @@ export default function page() {
                         <span>フォロワー <b>456</b></span>
                     </div>
                 </div>
+
             </div>
             {/* プロフィール（自己紹介文）追加 */}
             <div style={{ paddingLeft: "23px", paddingRight: "24px", marginBottom: "10px", color: "#333", fontSize: "17px" }}>
