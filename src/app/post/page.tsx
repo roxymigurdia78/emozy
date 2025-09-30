@@ -194,10 +194,10 @@ export default function PostPage() {
                         className = {styles.fileInput}
                     />
                 </label>
-                {preview ? 
-                    (<img src={preview} alt="preview" className="mt-2 w-48 rounded" />)
-                    : 
-                    (<p className={styles.noFile}>写真が選択されていません</p>
+        {preview ? 
+          (<Image src={preview} alt="preview" width={192} height={192} className="mt-2 w-48 rounded" />)
+          : 
+          (<p className={styles.noFile}>写真が選択されていません</p>
                 )}
             </div>
             

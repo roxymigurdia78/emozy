@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import Toukou from "../components/toukou";
 import { useEffect } from "react";
+import type { Post } from "../components/toukou";
 export default function Page() {
     // 初期表示で全ランキング取得
     useEffect(() => {
@@ -142,7 +143,7 @@ export default function Page() {
                 {posts.length === 0 ? (
                     <div style={{ color: "#888", marginTop: "32px" }}>絵文字を選択してください。</div>
                 ) : (
-                    posts.map((post, index) => (
+                    posts.map((post: Post, index: number) => (
                         <Toukou key={`${post.id}-${index}`} post={post} />
                     ))
                 )}

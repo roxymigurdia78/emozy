@@ -19,21 +19,6 @@ type ApiPost = {
 export default function Home() {
 
     const [posts, setPosts] = useState<Post[]>([]);
-    // 絵文字IDリスト（ID順）
-    const emotionsList = [
-        "😎", // 1
-        "😭", // 2
-        "😃", // 3
-        "😤", // 4
-        "🤣", // 5
-        "😩", // 6
-        "☹️", // 7
-        "😊", // 8
-        "😜", // 9
-        "😡", // 10
-        "😆", // 11
-        "😘", // 12
-    ];
     useEffect(() => {
         fetch("http://localhost:3333/api/v1/posts/")
             .then(res => res.json())
@@ -77,12 +62,6 @@ export default function Home() {
             />
         </Link>    
     </header>
-
-
-
-
-
-
 
     <main style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: "0" }}>
         {posts.length === 0 ? (
