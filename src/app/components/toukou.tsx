@@ -20,7 +20,9 @@ export default function Toukou({ post }: { post: Post }) {
   // 投稿ID（API用）
   const postId = post.id;
   // リアクション数のローカル状態（初期値はprops reaction_counts）
-  const counts = post.reaction_counts || Array(post.reaction_ids.length).fill(1);
+  const [reactionCounts, setReactionCounts] = useState(
+    post.reaction_counts || Array(post.reaction_ids.length).fill(0)
+  );
   return (
     <div style={{
       padding: "10px",
@@ -74,6 +76,11 @@ export default function Toukou({ post }: { post: Post }) {
                 ? prev.filter(i => i !== idx)
                 : [...prev, idx]
             );
+            setReactionCounts(currentCounts => {
+              const newCounts = [...currentCounts];
+              newCounts[idx] = alreadySelected ? newCounts[idx] - 1 : newCounts[idx] + 1;
+              return newCounts;
+            });
             try {
               const putBody = {
                 post: {
@@ -92,6 +99,13 @@ export default function Toukou({ post }: { post: Post }) {
             } catch (e) {
               console.error("リアクション送信失敗", e);
               alert("リアクション送信失敗");
+
+              // 失敗したら数字を元に戻す
+              setReactionCounts(currentCounts => {
+                const newCounts = [...currentCounts];
+                newCounts[idx] = alreadySelected ? newCounts[idx] + 1 : newCounts[idx] - 1;
+                return newCounts;
+              });
             }
           };
           return (
@@ -115,7 +129,8 @@ export default function Toukou({ post }: { post: Post }) {
               }}
             >
               <span style={{ zIndex: 1 }}>{emoji}</span>
-              <span style={{ marginLeft: "7px", fontSize: "15px", color: "#333" }}>{counts[idx]}</span>
+               {/* 表示に state を使う */}
+              <span style={{ marginLeft: "7px", fontSize: "15px", color: "#333" }}>{reactionCounts[idx]}</span>
             </button>
           );
         })}
