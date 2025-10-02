@@ -1,24 +1,38 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import styles from "./PostPage.module.css";
 import Link from "next/link";
 import Image from "next/image";
 
-
 export default function PostPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
-  const [userId, setUserId] = useState("");
+  const [userId, setUserId] = useState(() => searchParams.get("userId") ?? "");
   const [postType, setPostType] = useState<"text" | "photo" | null>(null);
   const [text, setText] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [selectedEmotions, setSelectedEmotions] = useState<string[]>([]);
   const [isEmotionOpen, setIsEmotionOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [shouldUseAiCheck, setShouldUseAiCheck] = useState(true);
+  const [pendingContent, setPendingContent] = useState("");
+  const [submitMessage, setSubmitMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    const idFromQuery = searchParams.get("userId");
+    if (idFromQuery) {
+      setUserId((current) => (current === idFromQuery ? current : idFromQuery));
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (userId) {
+      return;
+    }
     if (typeof window === "undefined") {
       return;
     }
@@ -26,7 +40,20 @@ export default function PostPage() {
     if (storedId) {
       setUserId(storedId);
     }
-  }, []);
+  }, [userId]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    if (userId) {
+      try {
+        window.localStorage.setItem("emozyUserId", userId);
+      } catch (error) {
+        console.warn("ユーザーIDの保存に失敗しました", error);
+      }
+    }
+  }, [userId]);
 
   // 感情の候補（ID順）
   const emotions = [
@@ -55,7 +82,7 @@ export default function PostPage() {
   // 感情の選択・解除
   const toggleSelectEmotion = (emoji: string) => {
     if (selectedEmotions.includes(emoji)) {
-      setSelectedEmotions(selectedEmotions.filter(e => e !== emoji));
+      setSelectedEmotions(selectedEmotions.filter((e) => e !== emoji));
     } else if (selectedEmotions.length < 3) {
       setSelectedEmotions([...selectedEmotions, emoji]);
     }
@@ -131,13 +158,62 @@ export default function PostPage() {
           reaction_ids,
         },
       };
-
       if (imageBase64) {
         body.post.image = imageBase64;
       }
+      const rawText = text;
+      const contentPreview =
+        postType === "text"
+          ? rawText
+          : rawText || (photo ? "写真を確認中です" : "");
 
+      let shouldResetSubmitState = true;
       try {
+        setIsSubmitting(true);
+        setSubmitMessage(shouldUseAiCheck ? "確認中..." : "投稿送信中...");
         console.log("送信するJSON:", JSON.stringify(body));
+
+        // 投稿内容が通報対象でないことを確認するAPIに送信
+        //{
+        //   "report": {
+        //     "content": "こんにちは"
+        //   }
+        // }
+        const report_body = {
+          report: {
+            content: postType === "text" ? text : text,
+          },
+        };
+        if (shouldUseAiCheck) {
+          const reportRes = await fetch("http://localhost:3333/api/v1/report", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(report_body),
+          });
+          const reportData = await reportRes.json();
+          console.log("報告APIのレスポンス:", reportData);
+          if (!reportRes.ok) {
+            throw new Error("投稿に失敗しました");
+          }
+          const isReported =
+            (reportData?.report && reportData.report.is_report) ||
+            reportData?.is_report;
+          if (isReported) {
+            setPendingContent(
+              rawText.trim() ? rawText : contentPreview || "投稿内容は空です"
+            );
+            const reportMessage =
+              (reportData?.report && reportData.report.response) ||
+              reportData?.response ||
+              "投稿内容が不適切です";
+            setSubmitMessage(reportMessage);
+            setIsSubmitting(false);
+            shouldResetSubmitState = false;
+            return;
+          }
+        }
         const res = await fetch("http://localhost:3333/api/v1/posts", {
           method: "POST",
           headers: {
@@ -145,21 +221,27 @@ export default function PostPage() {
           },
           body: JSON.stringify(body),
         });
-
         if (!res.ok) {
           throw new Error("投稿失敗");
         }
-
-        router.push("/home");
+        router.push(`/home?refresh=${Date.now()}`);
       } catch (err) {
-        alert("投稿に失敗しました");
+        setSubmitMessage("投稿に失敗しました");
+        setIsSubmitting(false);
+        shouldResetSubmitState = false;
         console.error(err);
+      } finally {
+        if (shouldResetSubmitState) {
+          setIsSubmitting(false);
+          setSubmitMessage(null);
+          setPendingContent("");
+        }
       }
     };
     postData();
   };
 
-  return(
+  return (
     <div className="min-h-screen bg-gradient-to-br from-[#7ADAD5] to-[#89CFF0] flex flex-col justify-center items-center">
       {/* ヘッダー */}
       <header className="w-full flex justify-center py-6">
@@ -179,7 +261,7 @@ export default function PostPage() {
         {/* 上部バー */}
         <div className="relative mb-4 flex items-center justify-center">
           <button
-            onClick={() => router.push("/home")}
+            onClick={() => router.push(`/home?refresh=${Date.now()}`)}
             className="absolute left-0 text-2xl font-bold text-gray-500 hover:text-gray-800"
           >
             ×
@@ -277,7 +359,10 @@ export default function PostPage() {
         {/* 投稿ボタン */}
         <button
           onClick={handleSubmit}
-          className="mt-6 w-full bg-gradient-to-r from-[#7ADAD5] to-[#5CCCCC] text-white py-3 rounded-lg font-bold shadow-md hover:opacity-90 transition"
+          disabled={isSubmitting}
+          className={`mt-6 w-full bg-gradient-to-r from-[#7ADAD5] to-[#5CCCCC] text-white py-3 rounded-lg font-bold shadow-md transition ${
+            isSubmitting ? "opacity-60 cursor-not-allowed" : "hover:opacity-90"
+          }`}
         >
           シェアする
         </button>
@@ -314,6 +399,57 @@ export default function PostPage() {
           </div>
         </div>
       )}
+
+      {submitMessage && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gradient-to-br from-[#7ADAD5]/80 to-[#89CFF0]/80">
+          <div className="bg-white px-8 py-6 rounded-2xl shadow-xl flex flex-col items-center gap-4 max-w-md w-full">
+            {pendingContent && (
+              <div className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-left">
+                <p className="text-sm font-semibold text-gray-600 mb-1">
+                  投稿内容
+                </p>
+                <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">
+                  {pendingContent}
+                </p>
+              </div>
+            )}
+            <p className="text-lg font-semibold text-gray-700 text-center whitespace-pre-line">
+              {submitMessage}
+            </p>
+            {isSubmitting ? (
+              <div
+                className={`relative w-64 h-3 bg-gray-200 rounded-full overflow-hidden ${styles.progressTrack}`}
+              >
+                <div className={styles.progressIndicator} />
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setSubmitMessage(null);
+                  setPendingContent("");
+                }}
+                className="px-6 py-2 bg-[#7ADAD5] text-white rounded-full font-semibold hover:opacity-90 transition"
+              >
+                閉じる
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={() => setShouldUseAiCheck((prev) => !prev)}
+        aria-pressed={shouldUseAiCheck}
+        className={`fixed bottom-6 right-6 z-40 px-5 py-3 rounded-full shadow-lg text-sm font-semibold transition-transform duration-200 hover:scale-105 ${
+          shouldUseAiCheck
+            ? "bg-[#7ADAD5] text-white"
+            : "bg-white/90 text-[#236066] border border-[#7ADAD5]"
+        }`}
+      >
+        {shouldUseAiCheck ? "AI確認オン" : "AIで確認する"}
+      </button>
     </div>
   );
 }

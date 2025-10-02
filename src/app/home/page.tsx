@@ -20,6 +20,7 @@ type ApiPost = {
 export default function Home() {
 
     const [posts, setPosts] = useState<Post[]>([]);
+    const [currentUserId, setCurrentUserId] = useState("");
     useEffect(() => {
         fetch("http://localhost:3333/api/v1/posts/", {
             method: "GET",
@@ -51,6 +52,16 @@ export default function Home() {
                 setPosts(posts);
             })
             .catch(err => console.error("投稿取得エラー", err));
+    }, []);
+
+    useEffect(() => {
+        if (typeof window === "undefined") {
+            return;
+        }
+        const storedId = window.localStorage.getItem("emozyUserId");
+        if (storedId) {
+            setCurrentUserId(storedId);
+        }
     }, []);
 
   return (
@@ -112,7 +123,10 @@ export default function Home() {
             style={{ marginLeft: "0px", marginTop: "10px", marginBottom: "15px", marginRight: "0px", minWidth: "65px", minHeight: "65px" }}
         />
     </Link>
-    <Link href="post" style={{ display: "flex", alignItems: "flex-end", height: "100px", flexShrink: 0, flexGrow: 0 }}>
+    <Link
+        href={currentUserId ? `/post?userId=${encodeURIComponent(currentUserId)}` : "/post"}
+        style={{ display: "flex", alignItems: "flex-end", height: "100px", flexShrink: 0, flexGrow: 0 }}
+    >
         <Image
             src="/images/toukouicon.png"
             alt="posticon"
