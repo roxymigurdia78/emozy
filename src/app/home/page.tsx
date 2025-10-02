@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 type ApiPost = {
     id: number;
     user_id: number;
+    name: string;
     topic_id: number;
     content: string;
     image_url: string;
@@ -30,7 +31,7 @@ export default function Home() {
                     const reaction_counts = item.num_reactions ? Object.values(item.num_reactions) : [0,0,0];
                     return {
                         id: item.id,
-                        user: `user${item.user_id}`,
+                        user: item.name,    // ユーザー名に変更
                         userIconUrl: "/images/title.png", // 仮アイコン
                         content: item.content,
                         imageUrl: item.image_url,
