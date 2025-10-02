@@ -50,3 +50,27 @@
 .typeButtonActive {
     background: #e5e7eb;
 }
+
+.progressTrack {
+  position: relative;
+}
+
+.progressIndicator {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 45%;
+  background: linear-gradient(90deg, rgba(122, 218, 213, 1) 0%, rgba(92, 204, 204, 0.6) 100%);
+  border-radius: 9999px;
+  animation: progressLoop 1.6s ease-in-out infinite;
+  transform: translateX(-100%);
+}
+
+@keyframes progressLoop {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(220%);
+  }
+}

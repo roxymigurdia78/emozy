@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import styles from "./PostPage.module.css";
 import Link from "next/link";
 import Image from "next/image";
-
+import { report } from "process";
 
 export default function PostPage() {
   const router = useRouter();
@@ -16,6 +16,9 @@ export default function PostPage() {
   const [preview, setPreview] = useState<string | null>(null);
   const [selectedEmotions, setSelectedEmotions] = useState<string[]>([]);
   const [isEmotionOpen, setIsEmotionOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pendingContent, setPendingContent] = useState("");
+  const [submitMessage, setSubmitMessage] = useState<string | null>(null);
 
   // 感情の候補（ID順）
   const emotions = [
@@ -44,7 +47,7 @@ export default function PostPage() {
   // 感情の選択・解除
   const toggleSelectEmotion = (emoji: string) => {
     if (selectedEmotions.includes(emoji)) {
-      setSelectedEmotions(selectedEmotions.filter(e => e !== emoji));
+      setSelectedEmotions(selectedEmotions.filter((e) => e !== emoji));
     } else if (selectedEmotions.length < 3) {
       setSelectedEmotions([...selectedEmotions, emoji]);
     }
@@ -79,50 +82,111 @@ export default function PostPage() {
 
     const postData = async () => {
       type PostBody = {
-        "post":{
-        user_id: number;
-        topic_id: number;
-        content: string;
-        image?: string;
-        reaction_ids: number[];
-      }};
+        post: {
+          user_id: number;
+          topic_id: number;
+          content: string;
+          image?: string;
+          reaction_ids: number[];
+        };
+      };
       let imageBase64 = "";
       if (postType === "photo" && photo) {
         imageBase64 = await toBase64(photo);
       }
-        // selectedEmotionsからreaction_idsを生成
-        const reaction_ids = selectedEmotions.map(e => emotions.indexOf(e) + 1);
-        const body: PostBody = { "post":{
+      // selectedEmotionsからreaction_idsを生成
+      const reaction_ids = selectedEmotions.map((e) => emotions.indexOf(e) + 1);
+      const body: PostBody = {
+        post: {
           user_id: 1, // 仮のユーザーID
           topic_id: 1, // 仮のトピックID
           content: postType === "text" ? text : text,
           reaction_ids,
-        }};
-        if (imageBase64) {
-          body.post.image = imageBase64;
-        }
-      try {
-      console.log("送信するJSON:", JSON.stringify(body));
-      const res = await fetch("http://localhost:3333/api/v1/posts", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
         },
-        body: JSON.stringify(body),
-      });
+      };
+      if (imageBase64) {
+        body.post.image = imageBase64;
+      }
+      const rawText = text;
+      const contentPreview =
+        postType === "text"
+          ? rawText
+          : rawText || (photo ? "写真を確認中です" : "");
+      // setPendingContent(rawText.trim() ? rawText : contentPreview || "投稿内容は空です");
+      let shouldResetSubmitState = true;
+      try {
+        setIsSubmitting(true);
+        setSubmitMessage("確認中...");
+        console.log("送信するJSON:", JSON.stringify(body));
+
+        // 投稿内容が通報対象でないことを確認するAPIに送信
+        //{
+        //   "report": {
+        //     "content": "こんにちは"
+        //   }
+        // }
+        const report_body = {
+          report: {
+            content: postType === "text" ? text : text,
+          },
+        };
+        const reportRes = await fetch("http://localhost:3333/api/v1/report", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(report_body),
+        });
+        // 返ってきたjsonを確認
+        const reportData = await reportRes.json();
+        console.log("報告APIのレスポンス:", reportData);
+        if (!reportRes.ok) {
+          throw new Error("投稿に失敗しました");
+        }
+        const isReported =
+          (reportData?.report && reportData.report.is_report) ||
+          reportData?.is_report;
+        if (isReported) {
+          setPendingContent(
+            rawText.trim() ? rawText : contentPreview || "投稿内容は空です"
+          );
+          const reportMessage =
+            (reportData?.report && reportData.report.response) ||
+            reportData?.response ||
+            "投稿内容が不適切です";
+          setSubmitMessage(reportMessage);
+          setIsSubmitting(false);
+          shouldResetSubmitState = false;
+          return;
+        }
+        const res = await fetch("http://localhost:3333/api/v1/posts", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+        });
         if (!res.ok) {
           throw new Error("投稿失敗");
         }
         router.push("/home");
       } catch (err) {
-        alert("投稿に失敗しました");
+        setSubmitMessage("投稿に失敗しました");
+        setIsSubmitting(false);
+        shouldResetSubmitState = false;
         console.error(err);
+      } finally {
+        if (shouldResetSubmitState) {
+          setIsSubmitting(false);
+          setSubmitMessage(null);
+          setPendingContent("");
+        }
       }
     };
     postData();
   };
 
-  return(
+  return (
     <div className="min-h-screen bg-gradient-to-br from-[#7ADAD5] to-[#89CFF0] flex flex-col justify-center items-center">
       {/* ヘッダー */}
       <header className="w-full flex justify-center py-6">
@@ -240,7 +304,10 @@ export default function PostPage() {
         {/* 投稿ボタン */}
         <button
           onClick={handleSubmit}
-          className="mt-6 w-full bg-gradient-to-r from-[#7ADAD5] to-[#5CCCCC] text-white py-3 rounded-lg font-bold shadow-md hover:opacity-90 transition"
+          disabled={isSubmitting}
+          className={`mt-6 w-full bg-gradient-to-r from-[#7ADAD5] to-[#5CCCCC] text-white py-3 rounded-lg font-bold shadow-md transition ${
+            isSubmitting ? "opacity-60 cursor-not-allowed" : "hover:opacity-90"
+          }`}
         >
           シェアする
         </button>
@@ -274,6 +341,44 @@ export default function PostPage() {
             >
               決定
             </button>
+          </div>
+        </div>
+      )}
+
+      {submitMessage && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gradient-to-br from-[#7ADAD5]/80 to-[#89CFF0]/80">
+          <div className="bg-white px-8 py-6 rounded-2xl shadow-xl flex flex-col items-center gap-4 max-w-md w-full">
+            {pendingContent && (
+              <div className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-left">
+                <p className="text-sm font-semibold text-gray-600 mb-1">
+                  投稿内容
+                </p>
+                <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">
+                  {pendingContent}
+                </p>
+              </div>
+            )}
+            <p className="text-lg font-semibold text-gray-700 text-center whitespace-pre-line">
+              {submitMessage}
+            </p>
+            {isSubmitting ? (
+              <div
+                className={`relative w-64 h-3 bg-gray-200 rounded-full overflow-hidden ${styles.progressTrack}`}
+              >
+                <div className={styles.progressIndicator} />
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setSubmitMessage(null);
+                  setPendingContent("");
+                }}
+                className="px-6 py-2 bg-[#7ADAD5] text-white rounded-full font-semibold hover:opacity-90 transition"
+              >
+                閉じる
+              </button>
+            )}
           </div>
         </div>
       )}
