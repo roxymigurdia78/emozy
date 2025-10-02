@@ -21,7 +21,15 @@ export default function Home() {
 
     const [posts, setPosts] = useState<Post[]>([]);
     useEffect(() => {
-        fetch("http://localhost:3333/api/v1/posts/")
+        fetch("http://localhost:3333/api/v1/posts/", {
+            method: "GET",
+            headers: {
+            "Content-Type": "application/json",
+            },
+            cache: "no-store",     // ← Chrome/Edge の再利用バグ回避
+            keepalive: false,      // ← Windows で特に有効
+            mode: "cors",          // ← 明示しておくとわかりやすい
+        })
             .then(res => res.json())
             .then(data => {
                 console.log("APIレスポンス:", data);
