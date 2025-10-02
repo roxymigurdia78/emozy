@@ -10,6 +10,7 @@ export type Post = {
   imageUrl?: string; // 投稿画像（任意）
   reaction_ids: number[];
   reaction_counts?: number[]; // 各絵文字のリアクション数
+  reacted_reaction_ids?: number[];
 };
 
 export default function Toukou({ post }: { post: Post }) {
@@ -26,14 +27,23 @@ export default function Toukou({ post }: { post: Post }) {
   const [userId, setUserId] = useState("");
 
   useEffect(() => {
-    if (typeof window === "undefined") {
+    // ローカルストレージからユーザーIDを取得
+      if (typeof window === "undefined") {
       return;
     }
     const storedId = window.localStorage.getItem("emozyUserId");
     if (storedId) {
       setUserId(storedId);
     }
-  }, []);
+
+    // reacted_reaction_ids の初期選択状態
+    const reactedIds = post.reacted_reaction_ids || [];
+    const initialSelected = post.reaction_ids
+      .map((id, idx) => reactedIds.includes(id) ? idx : null)
+      .filter((idx): idx is number => idx !== null);
+    setSelectedIdx(initialSelected);
+  }, [post.reacted_reaction_ids, post.reaction_ids]);
+
   return (
     <div style={{
       padding: "10px",
