@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./PostPage.module.css";
 import Link from "next/link";
@@ -10,12 +10,23 @@ import Image from "next/image";
 export default function PostPage() {
   const router = useRouter();
 
+  const [userId, setUserId] = useState("");
   const [postType, setPostType] = useState<"text" | "photo" | null>(null);
   const [text, setText] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [selectedEmotions, setSelectedEmotions] = useState<string[]>([]);
   const [isEmotionOpen, setIsEmotionOpen] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const storedId = window.localStorage.getItem("emozyUserId");
+    if (storedId) {
+      setUserId(storedId);
+    }
+  }, []);
 
   // 感情の候補（ID順）
   const emotions = [
@@ -52,6 +63,10 @@ export default function PostPage() {
 
   // 投稿処理
   const handleSubmit = () => {
+    if (!postType) {
+      alert("テキスト投稿か写真投稿のどちらかを選択してください");
+      return;
+    }
     if (postType === "text" && !text.trim()) {
       alert("テキストを入力してください");
       return;
@@ -62,6 +77,19 @@ export default function PostPage() {
     }
     if (selectedEmotions.length === 0) {
       alert("感情を1つ以上3つ以下で選んでください");
+      return;
+    }
+
+    if (!userId) {
+      alert("ユーザー情報が見つかりません。ログインし直してください。");
+      router.push("/signin");
+      return;
+    }
+
+    const numericUserId = Number(userId);
+    if (Number.isNaN(numericUserId)) {
+      alert("ユーザーIDが正しく取得できませんでした。再度ログインしてください。");
+      router.push("/signin");
       return;
     }
 
@@ -79,40 +107,49 @@ export default function PostPage() {
 
     const postData = async () => {
       type PostBody = {
-        "post":{
-        user_id: number;
-        topic_id: number;
-        content: string;
-        image?: string;
-        reaction_ids: number[];
-      }};
+        post: {
+          user_id: number;
+          topic_id: number;
+          content: string;
+          image?: string;
+          reaction_ids: number[];
+        };
+      };
+
       let imageBase64 = "";
       if (postType === "photo" && photo) {
         imageBase64 = await toBase64(photo);
       }
-        // selectedEmotionsからreaction_idsを生成
-        const reaction_ids = selectedEmotions.map(e => emotions.indexOf(e) + 1);
-        const body: PostBody = { "post":{
-          user_id: 1, // 仮のユーザーID
-          topic_id: 1, // 仮のトピックID
-          content: postType === "text" ? text : text,
+
+      // selectedEmotionsからreaction_idsを生成
+      const reaction_ids = selectedEmotions.map((emoji) => emotions.indexOf(emoji) + 1);
+      const body: PostBody = {
+        post: {
+          user_id: numericUserId,
+          topic_id: 1, // TODO: トピック選択が実装されたら置き換え
+          content: text,
           reaction_ids,
-        }};
-        if (imageBase64) {
-          body.post.image = imageBase64;
-        }
-      try {
-      console.log("送信するJSON:", JSON.stringify(body));
-      const res = await fetch("http://localhost:3333/api/v1/posts", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
         },
-        body: JSON.stringify(body),
-      });
+      };
+
+      if (imageBase64) {
+        body.post.image = imageBase64;
+      }
+
+      try {
+        console.log("送信するJSON:", JSON.stringify(body));
+        const res = await fetch("http://localhost:3333/api/v1/posts", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+        });
+
         if (!res.ok) {
           throw new Error("投稿失敗");
         }
+
         router.push("/home");
       } catch (err) {
         alert("投稿に失敗しました");

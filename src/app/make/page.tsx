@@ -1,19 +1,102 @@
 "use client";
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 
 export default function MakeProfilePage() {
     const router = useRouter();
-    const [userId, setUserId] = useState('');
+    const searchParams = useSearchParams();
+    // サインアップで受け取ったユーザーID・プロフィール入力値などのローカル状態
+    const [userId, setUserId] = useState(() => searchParams.get('userId') ?? '');
     const [userName, setUserName] = useState('');
     const [profile, setProfile] = useState('');
+    const [message, setMessage] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
 
-    const handleComplete = () => {
-        // This is where you would typically save the user's data
-        console.log({ userId, userName, profile });
-        router.push('/home');
+    // 端末に保存されたユーザーIDを初期表示に利用
+    useEffect(() => {
+        if (typeof window === 'undefined') {
+            return;
+        }
+        const storedId = window.localStorage.getItem('emozyUserId');
+        if (storedId) {
+            setUserId((current) => (current ? current : storedId));
+        }
+    }, []);
+
+    // クエリパラメータに含まれるuserIdを初期化・更新
+    useEffect(() => {
+        const idFromQuery = searchParams.get('userId');
+        if (idFromQuery) {
+            setUserId((current) => (current === idFromQuery ? current : idFromQuery));
+        }
+    }, [searchParams]);
+
+    // userIdを常に最新の状態で保存しておく
+    useEffect(() => {
+        if (typeof window === 'undefined') {
+            return;
+        }
+        if (userId) {
+            try {
+                window.localStorage.setItem('emozyUserId', userId);
+            } catch (error) {
+                console.warn('ユーザーIDの保存に失敗しました', error);
+            }
+        }
+    }, [userId]);
+
+    // プロフィール登録APIを呼び出し、成功時に/homeへ遷移
+    const handleComplete = async () => {
+        if (!userId.trim()) {
+            alert('ユーザーIDが取得できませんでした。サインアップからやり直してください。');
+            return;
+        }
+        if (!userName.trim()) {
+            alert('名前を入力してください。');
+            return;
+        }
+        if (!profile.trim()) {
+            alert('プロフィールを入力してください。');
+            return;
+        }
+
+        setIsLoading(true);
+        setMessage('');
+
+        try {
+            // APIに送信するプロフィールデータ
+            const payload = {
+                user: {
+                    name: userName,
+                    profile,
+                },
+            };
+
+            // サーバーへPUTリクエストを送信
+            const response = await fetch(`http://localhost:3333/api/v1/make/${encodeURIComponent(userId)}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+            });
+
+            if (!response.ok) {
+                const errorBody = await response.text();
+                console.error('プロフィール更新失敗:', errorBody);
+                throw new Error('プロフィールの更新に失敗しました。');
+            }
+
+            setMessage('プロフィールを保存しました！');
+            router.push('/home');
+        } catch (error) {
+            console.error(error);
+            setMessage('プロフィールの保存に失敗しました。時間をおいて再度お試しください。');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const dynamicStyles = `
@@ -52,7 +135,8 @@ export default function MakeProfilePage() {
                     </h1>
 
                     <form onSubmit={(e) => { e.preventDefault(); handleComplete(); }}>
-                        <div style={styles.inputGroup}>
+                        {/* IDは自動で割り当て */}
+                        {/* <div style={styles.inputGroup}>
                             <label htmlFor="userId" style={styles.label}>ID</label>
                             <input
                                 type="text"
@@ -61,9 +145,8 @@ export default function MakeProfilePage() {
                                 value={userId}
                                 onChange={(e) => setUserId(e.target.value)}
                                 style={styles.input}
-                               
                             />
-                        </div>
+                        </div> */}
 
                         <div style={styles.inputGroup}>
                             <label htmlFor="userName" style={styles.label}>名前</label>
@@ -94,10 +177,15 @@ export default function MakeProfilePage() {
                             type="submit"
                             className="form-button"
                             style={styles.button}
+                            disabled={isLoading}
                         >
-                            さあ、はじめよう！
+                            {isLoading ? '保存中...' : 'さあ、はじめよう！'}
                         </button>
                     </form>
+                    {/* API結果に応じたフィードバックメッセージ */}
+                    {message && (
+                        <p style={{ marginTop: '1rem', textAlign: 'center', color: '#155724' }}>{message}</p>
+                    )}
                 </div>
             </main>
         </>
