@@ -4,17 +4,100 @@ import { useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 
+type SigninResponsePayload = {
+  user_id?: number | string;
+  userId?: number | string;
+  id?: number | string;
+  user?: { id?: number | string };
+  data?: { user?: { id?: number | string } };
+  [key: string]: unknown;
+};
+
+const rememberUserId = (id: string) => {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    window.localStorage.setItem('emozyUserId', id);
+  } catch (error) {
+    console.warn('ユーザーIDの保存に失敗しました', error);
+  }
+};
+
+const extractUserId = (payload: unknown): string | null => {
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+  const parsed = payload as SigninResponsePayload;
+  const candidate =
+    parsed.user?.id ??
+    parsed.user_id ??
+    parsed.userId ??
+    parsed.id ??
+    parsed.data?.user?.id;
+  if (candidate === null || candidate === undefined) {
+    return null;
+  }
+  return String(candidate);
+};
+
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [message, setMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("ログイン:", { email, password });
 
-    // 仮のログイン成功処理
-    router.push("/home"); // ログイン後に /home へ遷移
+    if (!email.trim() || !password.trim()) {
+      alert('メールアドレスとパスワードを入力してください。');
+      return;
+    }
+
+    setIsLoading(true);
+    setMessage("");
+
+    try {
+      const body = {
+        signin: {
+          email,
+          password,
+        },
+      };
+
+      const res = await fetch('http://localhost:3333/api/v1/signin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      const data = await res.json().catch((error) => {
+        console.warn('レスポンスJSONの解析に失敗しました', error);
+        return null;
+      });
+
+      if (!res.ok) {
+        console.error('ログイン失敗レスポンス:', data ?? res.statusText);
+        throw new Error('ログインに失敗しました');
+      }
+
+      const userId = extractUserId(data);
+      if (userId) {
+        rememberUserId(userId);
+      } else {
+        console.warn('レスポンスにユーザーIDが含まれていません', data);
+      }
+
+      setMessage('ログインしました！');
+      router.push('/home');
+    } catch (error) {
+      console.error(error);
+      setMessage('ログインに失敗しました。時間をおいて再度お試しください。');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const isFormValid = email.trim() !== "" && password.trim() !== "";
@@ -56,17 +139,21 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            disabled={!isFormValid}
+            disabled={!isFormValid || isLoading}
             className={`w-full py-3 rounded-lg font-semibold text-white shadow-md transform transition 
               ${
-                isFormValid
+                isFormValid && !isLoading
                   ? "bg-gradient-to-r from-[#7ADAD5] to-[#2B9EA6] hover:scale-105 hover:shadow-lg"
                   : "bg-gray-400 cursor-not-allowed"
               }`}
           >
-            ログイン
+            {isLoading ? '送信中...' : 'ログイン'}
           </button>
         </form>
+
+        {message && (
+          <p className="text-green-100 mt-4 text-center">{message}</p>
+        )}
 
         {/* サインアップ遷移 */}
         <div className="mt-6 text-center text-sm text-white/90">
