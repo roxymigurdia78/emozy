@@ -1,6 +1,6 @@
 "use client";
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export type Post = {
   id: number;
@@ -23,6 +23,17 @@ export default function Toukou({ post }: { post: Post }) {
   const [reactionCounts, setReactionCounts] = useState(
     post.reaction_counts || Array(post.reaction_ids.length).fill(0)
   );
+  const [userId, setUserId] = useState("");
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const storedId = window.localStorage.getItem("emozyUserId");
+    if (storedId) {
+      setUserId(storedId);
+    }
+  }, []);
   return (
     <div style={{
       padding: "10px",
@@ -70,6 +81,16 @@ export default function Toukou({ post }: { post: Post }) {
           // PUTリクエスト
           const handleReaction = async () => {
             const alreadySelected = selectedIdx.includes(idx);
+            if (!userId) {
+              alert("ユーザー情報が見つかりません。ログインし直してください。");
+              return;
+            }
+
+            const numericUserId = Number(userId);
+            if (Number.isNaN(numericUserId)) {
+              alert("ユーザーIDが正しく取得できませんでした。再度ログインしてください。");
+              return;
+            }
             // トグル: 押してなければ+1, 押してたら-1
             setSelectedIdx(prev =>
               alreadySelected
@@ -84,7 +105,7 @@ export default function Toukou({ post }: { post: Post }) {
             try {
               const putBody = {
                 post: {
-                  user_id: 1, // 仮
+                  user_id: numericUserId,
                   reaction_id: Number(id),
                   increment: !alreadySelected
                 }
