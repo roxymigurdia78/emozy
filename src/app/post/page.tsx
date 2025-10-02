@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import styles from "./PostPage.module.css";
 import Link from "next/link";
 import Image from "next/image";
-import { report } from "process";
 
 export default function PostPage() {
   const router = useRouter();
@@ -17,6 +16,7 @@ export default function PostPage() {
   const [selectedEmotions, setSelectedEmotions] = useState<string[]>([]);
   const [isEmotionOpen, setIsEmotionOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [shouldUseAiCheck, setShouldUseAiCheck] = useState(true);
   const [pendingContent, setPendingContent] = useState("");
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
 
@@ -112,11 +112,11 @@ export default function PostPage() {
         postType === "text"
           ? rawText
           : rawText || (photo ? "写真を確認中です" : "");
-      // setPendingContent(rawText.trim() ? rawText : contentPreview || "投稿内容は空です");
+
       let shouldResetSubmitState = true;
       try {
         setIsSubmitting(true);
-        setSubmitMessage("確認中...");
+        setSubmitMessage(shouldUseAiCheck ? "確認中..." : "投稿送信中...");
         console.log("送信するJSON:", JSON.stringify(body));
 
         // 投稿内容が通報対象でないことを確認するAPIに送信
@@ -130,34 +130,35 @@ export default function PostPage() {
             content: postType === "text" ? text : text,
           },
         };
-        const reportRes = await fetch("http://localhost:3333/api/v1/report", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(report_body),
-        });
-        // 返ってきたjsonを確認
-        const reportData = await reportRes.json();
-        console.log("報告APIのレスポンス:", reportData);
-        if (!reportRes.ok) {
-          throw new Error("投稿に失敗しました");
-        }
-        const isReported =
-          (reportData?.report && reportData.report.is_report) ||
-          reportData?.is_report;
-        if (isReported) {
-          setPendingContent(
-            rawText.trim() ? rawText : contentPreview || "投稿内容は空です"
-          );
-          const reportMessage =
-            (reportData?.report && reportData.report.response) ||
-            reportData?.response ||
-            "投稿内容が不適切です";
-          setSubmitMessage(reportMessage);
-          setIsSubmitting(false);
-          shouldResetSubmitState = false;
-          return;
+        if (shouldUseAiCheck) {
+          const reportRes = await fetch("http://localhost:3333/api/v1/report", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(report_body),
+          });
+          const reportData = await reportRes.json();
+          console.log("報告APIのレスポンス:", reportData);
+          if (!reportRes.ok) {
+            throw new Error("投稿に失敗しました");
+          }
+          const isReported =
+            (reportData?.report && reportData.report.is_report) ||
+            reportData?.is_report;
+          if (isReported) {
+            setPendingContent(
+              rawText.trim() ? rawText : contentPreview || "投稿内容は空です"
+            );
+            const reportMessage =
+              (reportData?.report && reportData.report.response) ||
+              reportData?.response ||
+              "投稿内容が不適切です";
+            setSubmitMessage(reportMessage);
+            setIsSubmitting(false);
+            shouldResetSubmitState = false;
+            return;
+          }
         }
         const res = await fetch("http://localhost:3333/api/v1/posts", {
           method: "POST",
@@ -169,7 +170,7 @@ export default function PostPage() {
         if (!res.ok) {
           throw new Error("投稿失敗");
         }
-        router.push("/home");
+        router.push(`/home?refresh=${Date.now()}`);
       } catch (err) {
         setSubmitMessage("投稿に失敗しました");
         setIsSubmitting(false);
@@ -206,7 +207,7 @@ export default function PostPage() {
         {/* 上部バー */}
         <div className="relative mb-4 flex items-center justify-center">
           <button
-            onClick={() => router.push("/home")}
+            onClick={() => router.push(`/home?refresh=${Date.now()}`)}
             className="absolute left-0 text-2xl font-bold text-gray-500 hover:text-gray-800"
           >
             ×
@@ -382,6 +383,19 @@ export default function PostPage() {
           </div>
         </div>
       )}
+
+      <button
+        type="button"
+        onClick={() => setShouldUseAiCheck((prev) => !prev)}
+        aria-pressed={shouldUseAiCheck}
+        className={`fixed bottom-6 right-6 z-40 px-5 py-3 rounded-full shadow-lg text-sm font-semibold transition-transform duration-200 hover:scale-105 ${
+          shouldUseAiCheck
+            ? "bg-[#7ADAD5] text-white"
+            : "bg-white/90 text-[#236066] border border-[#7ADAD5]"
+        }`}
+      >
+        {shouldUseAiCheck ? "AI確認オン" : "AIで確認する"}
+      </button>
     </div>
   );
 }
