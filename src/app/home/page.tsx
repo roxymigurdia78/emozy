@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 type ApiPost = {
     id: number;
     user_id: number;
+    name: string;
     topic_id: number;
     content: string;
     image_url: string;
@@ -19,8 +20,17 @@ type ApiPost = {
 export default function Home() {
 
     const [posts, setPosts] = useState<Post[]>([]);
+    const [currentUserId, setCurrentUserId] = useState("");
     useEffect(() => {
-        fetch("http://localhost:3333/api/v1/posts/")
+        fetch("http://localhost:3333/api/v1/posts/", {
+            method: "GET",
+            headers: {
+            "Content-Type": "application/json",
+            },
+            cache: "no-store",     // ← Chrome/Edge の再利用バグ回避
+            keepalive: false,      // ← Windows で特に有効
+            mode: "cors",          // ← 明示しておくとわかりやすい
+        })
             .then(res => res.json())
             .then(data => {
                 console.log("APIレスポンス:", data);
@@ -30,7 +40,7 @@ export default function Home() {
                     const reaction_counts = item.num_reactions ? Object.values(item.num_reactions) : [0,0,0];
                     return {
                         id: item.id,
-                        user: `user${item.user_id}`,
+                        user: item.name,    // ユーザー名に変更
                         userIconUrl: "/images/title.png", // 仮アイコン
                         content: item.content,
                         imageUrl: item.image_url,
@@ -42,6 +52,16 @@ export default function Home() {
                 setPosts(posts);
             })
             .catch(err => console.error("投稿取得エラー", err));
+    }, []);
+
+    useEffect(() => {
+        if (typeof window === "undefined") {
+            return;
+        }
+        const storedId = window.localStorage.getItem("emozyUserId");
+        if (storedId) {
+            setCurrentUserId(storedId);
+        }
     }, []);
 
   return (
@@ -103,7 +123,10 @@ export default function Home() {
             style={{ marginLeft: "0px", marginTop: "10px", marginBottom: "15px", marginRight: "0px", minWidth: "65px", minHeight: "65px" }}
         />
     </Link>
-    <Link href="post" style={{ display: "flex", alignItems: "flex-end", height: "100px", flexShrink: 0, flexGrow: 0 }}>
+    <Link
+        href={currentUserId ? `/post?userId=${encodeURIComponent(currentUserId)}` : "/post"}
+        style={{ display: "flex", alignItems: "flex-end", height: "100px", flexShrink: 0, flexGrow: 0 }}
+    >
         <Image
             src="/images/toukouicon.png"
             alt="posticon"
