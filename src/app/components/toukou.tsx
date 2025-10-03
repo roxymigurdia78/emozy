@@ -1,6 +1,6 @@
 "use client";
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 export type Post = {
   id: number;
@@ -10,7 +10,6 @@ export type Post = {
   imageUrl?: string; // 投稿画像（任意）
   reaction_ids: number[];
   reaction_counts?: number[]; // 各絵文字のリアクション数
-  reacted_reaction_ids?: number[];
 };
 
 export default function Toukou({ post }: { post: Post }) {
@@ -21,29 +20,7 @@ export default function Toukou({ post }: { post: Post }) {
   // 投稿ID（API用）
   const postId = post.id;
   // リアクション数のローカル状態（初期値はprops reaction_counts）
-  const [reactionCounts, setReactionCounts] = useState(
-    post.reaction_counts || Array(post.reaction_ids.length).fill(0)
-  );
-  const [userId, setUserId] = useState("");
-
-  useEffect(() => {
-    // ローカルストレージからユーザーIDを取得
-      if (typeof window === "undefined") {
-      return;
-    }
-    const storedId = window.localStorage.getItem("emozyUserId");
-    if (storedId) {
-      setUserId(storedId);
-    }
-
-    // reacted_reaction_ids の初期選択状態
-    const reactedIds = post.reacted_reaction_ids || [];
-    const initialSelected = post.reaction_ids
-      .map((id, idx) => reactedIds.includes(id) ? idx : null)
-      .filter((idx): idx is number => idx !== null);
-    setSelectedIdx(initialSelected);
-  }, [post.reacted_reaction_ids, post.reaction_ids]);
-
+  const [counts, setCounts] = useState<number[]>(post.reaction_counts || Array(post.reaction_ids.length).fill(1));
   return (
     <div style={{
       padding: "10px",
@@ -55,14 +32,14 @@ export default function Toukou({ post }: { post: Post }) {
     }}>
       <div style={{ display: "flex", alignItems: "center", marginBottom: "8px", position: "relative" }}>
         <Image
-          src={post.userIconUrl}
+          src={post.userIconUrl && post.userIconUrl !== "" ? post.userIconUrl : "/images/syoki2.png"}
           alt="user icon"
           width={40}
           height={40}
           style={{ borderRadius: "50%", marginRight: "10px" }}
         />
-        <span style={{ fontWeight: "bold", fontSize: "16px" }}>{post.user}</span>
-        <Image
+  <span style={{ fontWeight: "bold", fontSize: "16px" }}>{post.user}</span>
+        <img
           src="/images/3ten.png"
           alt="3ten"
           width={24}
@@ -78,7 +55,7 @@ export default function Toukou({ post }: { post: Post }) {
       </div>
       <p style={{ fontSize: "15px", margin: "8px 0" }}>{post.content}</p>
       {post.imageUrl && (
-        <Image src={post.imageUrl} alt="post" width={400} height={300} style={{ width: "100%", borderRadius: "6px", marginTop: "8px" }} />
+        <img src={post.imageUrl} alt="post" style={{ width: "100%", borderRadius: "6px", marginTop: "8px" }} />
       )}
   <div style={{ marginTop: "6px", fontSize: "18px", display: "flex", gap: "16px" }}>
         {post.reaction_ids?.map((id, idx) => {
@@ -91,31 +68,16 @@ export default function Toukou({ post }: { post: Post }) {
           // PUTリクエスト
           const handleReaction = async () => {
             const alreadySelected = selectedIdx.includes(idx);
-            if (!userId) {
-              alert("ユーザー情報が見つかりません。ログインし直してください。");
-              return;
-            }
-
-            const numericUserId = Number(userId);
-            if (Number.isNaN(numericUserId)) {
-              alert("ユーザーIDが正しく取得できませんでした。再度ログインしてください。");
-              return;
-            }
             // トグル: 押してなければ+1, 押してたら-1
             setSelectedIdx(prev =>
               alreadySelected
                 ? prev.filter(i => i !== idx)
                 : [...prev, idx]
             );
-            setReactionCounts(currentCounts => {
-              const newCounts = [...currentCounts];
-              newCounts[idx] = alreadySelected ? newCounts[idx] - 1 : newCounts[idx] + 1;
-              return newCounts;
-            });
             try {
               const putBody = {
                 post: {
-                  user_id: numericUserId,
+                  user_id: 1, // 仮
                   reaction_id: Number(id),
                   increment: !alreadySelected
                 }
@@ -130,13 +92,6 @@ export default function Toukou({ post }: { post: Post }) {
             } catch (e) {
               console.error("リアクション送信失敗", e);
               alert("リアクション送信失敗");
-
-              // 失敗したら数字を元に戻す
-              setReactionCounts(currentCounts => {
-                const newCounts = [...currentCounts];
-                newCounts[idx] = alreadySelected ? newCounts[idx] + 1 : newCounts[idx] - 1;
-                return newCounts;
-              });
             }
           };
           return (
@@ -160,14 +115,13 @@ export default function Toukou({ post }: { post: Post }) {
               }}
             >
               <span style={{ zIndex: 1 }}>{emoji}</span>
-               {/* 表示に state を使う */}
-              <span style={{ marginLeft: "7px", fontSize: "15px", color: "#333" }}>{reactionCounts[idx]}</span>
+              <span style={{ marginLeft: "7px", fontSize: "15px", color: "#333" }}>{counts[idx]}</span>
             </button>
           );
         })}
       </div>
         <div style={{ position: "absolute", right: "13px", bottom: "8px", cursor: "pointer" }} onClick={() => setHearted(!hearted)}>
-          <Image
+          <img
             src="/images/heart.png"
             alt="heart"
             width={28}
