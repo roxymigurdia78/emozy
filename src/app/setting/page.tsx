@@ -66,11 +66,7 @@ export default function SettingPage() {
                 </Link>
 
                 {/* 右上：ポイントボタン */}
-                <Link href="/point">
-                    <button className="bg-white text-black font-bold rounded-full w-10 h-10 flex items-center justify-center shadow-md hover:bg-[#6ac5c0] transition">
-                        P
-                    </button>
-                </Link>
+                
             </div>
 
             <div className="mb-8 flex flex-col items-center z-10">
@@ -90,7 +86,16 @@ export default function SettingPage() {
                         お気に入り
                     </button>
                 </Link>
-
+                <Link href="/point">
+                    <button className="w-full bg-white text-black text-lg py-5 rounded-xl shadow-md transition hover:bg-[#6ac5c0]">
+                        ポイント設定
+                    </button>
+                </Link>
+                <Link href="/iconselection">
+                    <button className="w-full bg-white text-black text-lg py-5 rounded-xl shadow-md transition hover:bg-[#6ac5c0]">
+                        アイコン選択
+                    </button>
+                </Link>
                 <Link href="/make">
                     <button className="w-full bg-white text-black text-lg py-5 rounded-xl shadow-md transition hover:bg-[#6ac5c0]">
                         名前・プロフィール設定
