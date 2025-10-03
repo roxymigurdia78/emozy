@@ -54,7 +54,7 @@ export default function page() {
                             style={{ display: "block", opacity: 0.5, cursor: "pointer" }}
                         />
                     </Link>
-                    <span>{user ? user.id : "..."}</span>
+                    
                 </div>
             <div style={{ display: "flex", alignItems: "center", paddingLeft: "24px", marginBottom: "35px", marginTop: "26px" }}>
                 <Image
