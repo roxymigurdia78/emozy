@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 
 type IconPart = {
   id: number;
@@ -47,7 +48,7 @@ const BACKGROUND_ACQUIRE_ENDPOINT = "http://localhost:3333/api/v1/background_lis
 const FRAME_ACQUIRE_ENDPOINT = "http://localhost:3333/api/v1/frame_list/acquire";
 const USER_ENDPOINT = "http://localhost:3333/api/v1/users";
 const ASSET_BASE_URL = "http://localhost:3333";
-const DEFAULT_USER_ID = 14; // 仮のユーザーID（APIリクエストで使用）
+const DEFAULT_USER_ID = 1; // 仮のユーザーID（APIリクエストで使用）
 
 // パーツの優先順位
 const PART_ORDER = [
@@ -76,6 +77,11 @@ const PART_LABELS: Record<string, string> = {
   accessory: "装飾",
   background: "背景",
   frame: "フレーム",
+};
+
+const formatPoint = (point?: number | null) => {
+  if (typeof point !== "number") return "-";
+  return `${point.toLocaleString()} pt`;
 };
 
 // 画像URLを生成する関数。updatedAt が指定されていればキャッシュ回避用クエリを付与する
@@ -505,6 +511,51 @@ export default function Page() {
     };
   }, [selectedPartIds]);
 
+  const hasSelection = useMemo(
+    () => PART_ORDER.some((part) => Boolean(selectedPartIds[part])),
+    [selectedPartIds]
+  );
+
+  const activePartLabel = useMemo(() => {
+    if (!activePart) return "";
+    return PART_LABELS[activePart] ?? activePart;
+  }, [activePart]);
+
+  const activeAssetList = useMemo(() => {
+    if (!activePart) return [] as OwnedAsset[];
+    if (activePart === "background") return backgroundAssets;
+    if (activePart === "frame") return frameAssets;
+    return [] as OwnedAsset[];
+  }, [activePart, backgroundAssets, frameAssets]);
+
+  const getOptionCost = useCallback(
+    (part: string, option: IconPart) => {
+      if (part === "background") {
+        const asset = backgroundAssets.find(
+          (item) => normalizeImageKey(item.image) === normalizeImageKey(option.image)
+        );
+        return asset?.point ?? null;
+      }
+      if (part === "frame") {
+        const asset = frameAssets.find(
+          (item) => normalizeImageKey(item.image) === normalizeImageKey(option.image)
+        );
+        return asset?.point ?? null;
+      }
+      return null;
+    },
+    [backgroundAssets, frameAssets, normalizeImageKey]
+  );
+
+  const activeSelectionCost = useMemo(() => {
+    if (!activePart) return null;
+    const selectedId = selectedPartIds[activePart];
+    if (!selectedId) return null;
+    const option = parts[activePart]?.find((item) => item.id === selectedId);
+    if (!option) return null;
+    return getOptionCost(activePart, option);
+  }, [activePart, getOptionCost, parts, selectedPartIds]);
+
   const handleComplete = useCallback(async () => {
     setSaveError(null);
     const iconPartCount = Object.keys(selectionPayload.icon_parts).length;
@@ -562,303 +613,255 @@ export default function Page() {
   const activeSelectionId = activePart ? selectedPartIds[activePart] : undefined;
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "linear-gradient(135deg, #f7faff 0%, #e3e6f5 100%)",
-        position: "relative",
-      }}
-    >
-      <div style={{ maxWidth: "600px", margin: "0 auto", padding: "48px 0 0 0" }}>
-        {/* プレビュー枠 */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            marginBottom: "30px",
-          }}
-        >
-          <div
-            style={{
-              width: 220,
-              height: 220,
-              background: "#fff",
-              borderRadius: "50%",
-              boxShadow: "0 4px 24px #d0eaff",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              border: "4px solid #eaf4ff",
-              overflow: "hidden",
-            }}
-          >
-            <div
-              style={{
-                position: "relative",
-                width: 160,
-                height: 160,
-              }}
-            >
-              {PART_ORDER.map((part, index) => {
-                const selectedId = selectedPartIds[part];
-                if (!selectedId) return null;
-                const matchedPart = parts[part]?.find((item) => item.id === selectedId);
-                if (!matchedPart) return null;
-                if (!isPartOwned(part, matchedPart)) return null;
-                const src = resolveImageSrc(matchedPart.image, matchedPart.updated_at);
-                return (
-                  <div
-                    key={`${part}-${selectedId}`}
-                    style={{
-                      position: "absolute",
-                      inset: 0,
-                      zIndex: index,
-                    }}
-                  >
-                    <Image
-                      src={src}
-                      alt={PART_LABELS[part] ?? part}
-                      fill
-                      sizes="160px"
-                      style={{
-                        objectFit: "contain",
+    <div className="min-h-screen bg-gradient-to-br from-[#7ADAD5] to-[#89CFF0] flex flex-col">
+      <header className="w-full flex justify-center py-6">
+        <Link href="/home">
+          <Image
+            src="/images/emozy_logo.png"
+            alt="emozy logo"
+            width={140}
+            height={140}
+            className="hover:scale-105 transition-transform"
+            priority
+          />
+        </Link>
+      </header>
+
+      <main className="flex-1 w-full flex justify-center px-4 pb-16">
+        <div className="w-full max-w-4xl">
+          <div className="bg-white/95 backdrop-blur-sm shadow-2xl rounded-3xl p-6 md:p-8 flex flex-col gap-8">
+            <div className="flex flex-col items-center gap-6">
+              <div className="text-center">
+                {/* <h2 className="text-xl font-semibold text-gray-700">アイコンプレビュー</h2> */}
+                {/* <p className="mt-1 text-sm text-gray-500">パーツを選ぶとここで確認できます</p> */}
+              </div>
+              <div className="relative w-52 h-52 flex items-center justify-center">
+                <div className="relative w-44 h-44 rounded-full bg-white shadow-[0_15px_45px_rgba(122,218,213,0.35)] ring-4 ring-[#EAF4FF] overflow-hidden">
+                  {hasSelection ? (
+                    PART_ORDER.map((part, index) => {
+                      const selectedId = selectedPartIds[part];
+                      if (!selectedId) return null;
+                      const matchedPart = parts[part]?.find((item) => item.id === selectedId);
+                      if (!matchedPart) return null;
+                      if (!isPartOwned(part, matchedPart)) return null;
+                      const src = resolveImageSrc(matchedPart.image, matchedPart.updated_at);
+                      return (
+                        <div
+                          key={`${part}-${selectedId}`}
+                          className="absolute inset-0"
+                          style={{ zIndex: index }}
+                        >
+                          <Image
+                            src={src}
+                            alt={PART_LABELS[part] ?? part}
+                            fill
+                            sizes="176px"
+                            className="object-contain"
+                          />
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center px-6 text-center text-sm text-gray-400">
+                      パーツを選択するとプレビューが表示されます
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="text-sm font-medium text-gray-600 bg-[#F4FBFB] px-5 py-2 rounded-full shadow-inner">
+                {isUserLoading ? "ポイント読み込み中..." : `所持ポイント: ${formatPoint(userPoint)}`}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-6">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => scrollTabs("left")}
+                  disabled={!canScrollLeft}
+                  className={`h-10 w-10 rounded-full border transition ${
+                    canScrollLeft
+                      ? "border-[#7ADAD5] text-[#2A8881] bg-white hover:bg-[#E6F7F6]"
+                      : "border-gray-200 text-gray-300 bg-gray-100 cursor-not-allowed"
+                  }`}
+                >
+                  {"<"}
+                </button>
+                <div
+                  ref={tabsRef}
+                  className="flex gap-3 overflow-x-auto scroll-smooth py-1"
+                >
+                  {partKeys.map((key) => (
+                    <button
+                      key={key}
+                      type="button"
+                      ref={(el) => {
+                        tabButtonRefs.current[key] = el;
                       }}
-                    />
+                      className={`whitespace-nowrap rounded-2xl px-5 py-2 text-sm font-semibold transition ${
+                        activePart === key
+                          ? "bg-[#7ADAD5] text-white shadow-md shadow-[#7ADAD5]/40"
+                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      }`}
+                      onClick={() => setActivePart(key)}
+                    >
+                      {PART_LABELS[key] ?? key}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => scrollTabs("right")}
+                  disabled={!canScrollRight}
+                  className={`h-10 w-10 rounded-full border transition ${
+                    canScrollRight
+                      ? "border-[#7ADAD5] text-[#2A8881] bg-white hover:bg-[#E6F7F6]"
+                      : "border-gray-200 text-gray-300 bg-gray-100 cursor-not-allowed"
+                  }`}
+                >
+                  {">"}
+                </button>
+              </div>
+
+              {/* <div className="rounded-2xl bg-white border border-gray-100 shadow-inner px-5 py-4 flex flex-col gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-600">{activePartLabel || "パーツ"}</p>
+                    {/* <p className="text-xs text-gray-400">
+                      {activeOptions.length > 0
+                        ? `${activeOptions.length} 件のパーツが選択可能`
+                        : "パーツ候補がありません"}
+                    </p> */}
+                  {/* </div> */}
+                  {/* <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
+                    <span className="bg-[#F0FBFA] text-[#268F86] font-semibold px-3 py-1 rounded-full">
+                      {activeSelectionId ? "選択済み" : "未選択"}
+                    </span>
+                    {activeSelectionCost !== null && (
+                      <span className="inline-flex items-center gap-1 bg-[#FFF2E2] text-[#C97A1E] font-medium px-3 py-1 rounded-full">
+                        消費: {formatPoint(activeSelectionCost)}
+                      </span>
+                    )}
+                    {activeAssetList.length > 0 && (
+                      <span className="inline-flex items-center gap-1 bg-gray-100 px-3 py-1 rounded-full">
+                        所持: {activeAssetList.filter((asset) => asset.owned).length}/{activeAssetList.length}
+                      </span>
+                    )}
+                  </div> */}
+                {/* </div> */}
+              {/* </div> */}
+
+              <div className="rounded-2xl bg-gray-50 p-4 min-h-[160px]">
+                {isLoading && <p className="text-sm text-gray-500">パーツを読み込み中です...</p>}
+                {!isLoading && error && (
+                  <p className="text-sm text-red-500">読み込みに失敗しました: {error}</p>
+                )}
+                {!isLoading && !error && activeOptions.length === 0 && (
+                  <p className="text-sm text-gray-500">表示できるパーツがありません。</p>
+                )}
+                {!isLoading && !error && activeOptions.length > 0 && (
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4 justify-items-center">
+                    {activeOptions.map((option) => {
+                      const optionSrc = resolveImageSrc(option.image, option.updated_at);
+                      const isSelected = activeSelectionId === option.id;
+                      const isOwned = isPartOwned(activePart ?? "", option);
+                      const isAcquiring =
+                        acquiringTarget?.part === (activePart ?? "") && acquiringTarget?.optionId === option.id;
+                      const optionCost = getOptionCost(activePart ?? "", option);
+                      const optionClasses = [
+                        "relative flex items-center justify-center rounded-2xl border-2 bg-white transition-all duration-150 h-20 w-20 sm:h-24 sm:w-24",
+                        isSelected
+                          ? "border-[#7ADAD5] shadow-lg shadow-[#7ADAD5]/20"
+                          : "border-gray-200 hover:border-[#7ADAD5]/60 hover:-translate-y-1",
+                        isOwned ? "cursor-pointer" : isAcquiring ? "cursor-wait opacity-70" : "cursor-not-allowed opacity-60",
+                      ].join(" ");
+
+                      return (
+                        <div
+                          key={option.id}
+                          className={optionClasses}
+                          onClick={() => {
+                            if (isAcquiring) return;
+                            void handleOptionClick(activePart ?? "", option);
+                          }}
+                        >
+                          <Image
+                            src={optionSrc}
+                            alt={PART_LABELS[activePart ?? ""] ?? ""}
+                            fill
+                            sizes="96px"
+                            className={`object-contain p-2 ${!isOwned ? "grayscale" : ""}`}
+                          />
+                          {!isOwned && (
+                            <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/40 text-xs font-semibold text-white">
+                              {isAcquiring ? "購入中..." : "未所持"}
+                            </div>
+                          )}
+                          {optionCost !== null && (
+                            <div
+                              className={`absolute bottom-1 left-1 right-1 rounded-xl text-[10px] font-semibold text-center py-1 px-2 ${
+                                isOwned ? "bg-white/90 text-[#268F86]" : "bg-[#FFF2E2]/90 text-[#C97A1E]"
+                              }`}
+                            >
+                              {isOwned ? `購入済み ${formatPoint(optionCost)}` : `購入 ${formatPoint(optionCost)}`}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
+                )}
+              </div>
+
+              {/* <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-gray-700">選択データ</h3>
+                  <span className="text-xs text-gray-400">user_id: {selectionPayload.user_id}</span>
+                </div>
+                <pre className="text-xs text-gray-600 whitespace-pre-wrap break-all">
+                  {JSON.stringify(selectionPayload, null, 2)}
+                </pre>
+              </div> */}
+
+              {purchaseMessage && (
+                <p className="text-sm font-medium text-[#2f7a37] bg-[#E8F8EE] border border-[#a9e0b7] rounded-xl px-4 py-3">
+                  {purchaseMessage}
+                </p>
+              )}
+              {purchaseError && (
+                <p className="text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+                  {purchaseError}
+                </p>
+              )}
+              {saveError && (
+                <p className="text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+                  {saveError}
+                </p>
+              )}
+            </div>
+
+            <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              {/* <p className="text-sm text-gray-500">
+                {isSaving ? "保存処理を実行しています..." : "アイコンが完成したら保存ボタンを押してください"}
+              </p> */}
+              <button
+                type="button"
+                disabled={isSaving}
+                onClick={() => {
+                  void handleComplete();
+                }}
+                className={`inline-flex items-center justify-center rounded-full px-8 py-3 text-lg font-bold text-white transition shadow-lg shadow-[#7ADAD5]/40 ${
+                  isSaving
+                    ? "bg-gray-300 cursor-not-allowed shadow-none"
+                    : "bg-gradient-to-r from-[#7ADAD5] to-[#5CCCCC] hover:opacity-90"
+                }`}
+              >
+                {isSaving ? "保存中..." : "きせかえ完了"}
+              </button>
             </div>
           </div>
         </div>
-        {/* 部位選択タブ */}
-        <div
-          style={{
-            position: "relative",
-            display: "flex",
-            alignItems: "center",
-            gap: "12px",
-            marginBottom: "-5px",
-            paddingBottom: "10px",
-          }}
-        >
-        <button
-          type="button"
-          onClick={() => scrollTabs("left")}
-            disabled={!canScrollLeft}
-            style={{
-              width: "36px",
-              height: "36px",
-              borderRadius: "50%",
-              border: "1px solid #d0dcff",
-              background: canScrollLeft ? "#f3f6ff" : "#fbfbfb",
-              color: canScrollLeft ? "#4a5fc1" : "#b0b8d9",
-              cursor: canScrollLeft ? "pointer" : "default",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: "0 2px 6px rgba(74, 144, 226, 0.15)",
-              transition: "all 0.2s",
-            }}
-          >
-            {"<"}
-          </button>
-          <div
-            ref={tabsRef}
-            style={{
-              display: "flex",
-              gap: "16px",
-              overflowX: "auto",
-              scrollBehavior: "smooth",
-              padding: "0 4px",
-              flex: 1,
-            }}
-          >
-            {partKeys.map((key) => (
-              <button
-                key={key}
-                type="button"
-                ref={(el) => {
-                  tabButtonRefs.current[key] = el;
-                }}
-                style={{
-                  padding: "10px 22px",
-                  fontSize: "16px",
-                  fontWeight: "bold",
-                  borderRadius: "16px",
-                  border: activePart === key ? "2px solid #4a90e2" : "2px solid #eee",
-                  background: activePart === key ? "#eaf4ff" : "#fafafa",
-                  color: activePart === key ? "#222" : "#555",
-                  cursor: "pointer",
-                  boxShadow: activePart === key ? "0 2px 8px #b3d8ff" : "0 1px 4px #eee",
-                  transition: "all 0.2s",
-                  whiteSpace: "nowrap",
-                }}
-                onClick={() => setActivePart(key)}
-              >
-                {PART_LABELS[key] ?? key}
-              </button>
-            ))}
-          </div>
-        <button
-          type="button"
-          onClick={() => scrollTabs("right")}
-            disabled={!canScrollRight}
-            style={{
-              width: "36px",
-              height: "36px",
-              borderRadius: "50%",
-              border: "1px solid #d0dcff",
-              background: canScrollRight ? "#f3f6ff" : "#fbfbfb",
-              color: canScrollRight ? "#4a5fc1" : "#b0b8d9",
-              cursor: canScrollRight ? "pointer" : "default",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: "0 2px 6px rgba(74, 144, 226, 0.15)",
-              transition: "all 0.2s",
-            }}
-          >
-            {">"}
-          </button>
-        </div>
-        {/* 画像選択肢（横スクロール） */}
-        <div style={{ padding: "32px 24px", marginBottom: "30px" }}>
-          <div style={{ display: "flex", gap: "24px", overflowX: "auto", paddingBottom: "18px" }}>
-            {isLoading && <p style={{ color: "#555" }}>パーツを読み込み中です...</p>}
-            {!isLoading && error && (
-              <p style={{ color: "#d9534f" }}>読み込みに失敗しました: {error}</p>
-            )}
-            {!isLoading && !error && activeOptions.length === 0 && (
-              <p style={{ color: "#555" }}>表示できるパーツがありません。</p>
-            )}
-            {!isLoading && !error &&
-              activeOptions.map((option) => {
-                const optionSrc = resolveImageSrc(option.image, option.updated_at);
-                const isSelected = activeSelectionId === option.id;
-                const isOwned = isPartOwned(activePart ?? "", option);
-                const isAcquiring =
-                  acquiringTarget?.part === (activePart ?? "") && acquiringTarget?.optionId === option.id;
-                const disabledStyle = !isOwned
-                  ? {
-                      filter: "grayscale(100%)",
-                      opacity: 0.5,
-                      cursor: isAcquiring ? ("wait" as const) : ("not-allowed" as const),
-                    }
-                  : {};
-                const clickHandler = () => {
-                  if (isAcquiring) return;
-                  void handleOptionClick(activePart ?? "", option);
-                };
-                return (
-                  <div
-                    key={option.id}
-                    style={{
-                      position: "relative",
-                      cursor: isOwned ? "pointer" : isAcquiring ? "wait" : "not-allowed",
-                    }}
-                    onClick={clickHandler}
-                  >
-                    <Image
-                      key={`${option.id}-img`}
-                      src={optionSrc}
-                      alt={PART_LABELS[activePart ?? ""] ?? ""}
-                      width={72}
-                      height={72}
-                      style={{
-                        border: isSelected ? "3px solid #4a90e2" : "2px solid #eee",
-                        borderRadius: "18px",
-                        background: "#fafafa",
-                        boxShadow: isSelected ? "0 2px 8px #b3d8ff" : "0 1px 4px #eee",
-                        transition: "all 0.2s",
-                        ...disabledStyle,
-                      }}
-                    />
-                    {!isOwned && (
-                      <div
-                        style={{
-                          position: "absolute",
-                          inset: 0,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          color: "#fff",
-                          fontSize: "12px",
-                          fontWeight: "bold",
-                          background: "rgba(0,0,0,0.35)",
-                          borderRadius: "18px",
-                          pointerEvents: "none",
-                        }}
-                      >
-                        {isAcquiring ? "購入中..." : "未所持"}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-          </div>
-          <div
-            style={{
-              marginTop: "16px",
-              fontSize: "14px",
-              color: "#666",
-              background: "#fff",
-              padding: "12px 16px",
-              borderRadius: "12px",
-              boxShadow: "0 1px 4px #e0e7ff",
-            }}
-          >
-            <div style={{ fontWeight: "bold", marginBottom: "4px" }}>選択データ</div>
-            <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{JSON.stringify(selectionPayload, null, 2)}</pre>
-          </div>
-          {purchaseMessage && (
-            <p style={{ color: "#2f7a37", marginTop: "12px" }}>{purchaseMessage}</p>
-          )}
-          {purchaseError && (
-            <p style={{ color: "#d9534f", marginTop: "8px" }}>{purchaseError}</p>
-          )}
-          {saveError && (
-            <p style={{ color: "#d9534f", marginTop: "12px" }}>{saveError}</p>
-          )}
-        </div>
-      </div>
-      {/* きせかえ完了ボタン */}
-      <div
-        style={{
-          position: "fixed",
-          left: 0,
-          bottom: 0,
-          width: "100%",
-          display: "flex",
-          justifyContent: "center",
-          padding: "24px 0",
-          zIndex: 100,
-        }}
-      >
-        <button
-          type="button"
-          style={{
-            minWidth: "220px",
-            padding: "18px 0",
-            fontSize: "20px",
-            fontWeight: "bold",
-            borderRadius: "32px",
-            border: "none",
-            background: "linear-gradient(90deg, #4a90e2 0%, #50c9c3 100%)",
-            color: "#fff",
-            boxShadow: "0 4px 24px #b3d8ff",
-            cursor: "pointer",
-            letterSpacing: "2px",
-            transition: "all 0.2s",
-          }}
-          disabled={isSaving}
-          onClick={() => {
-            void handleComplete();
-          }}
-        >
-          {isSaving ? "保存中..." : "きせかえ完了"}
-        </button>
-      </div>
+      </main>
     </div>
   );
 }
