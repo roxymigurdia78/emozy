@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import style from "./search.module.css";
@@ -34,223 +34,129 @@ const emotionMap: Record<string, [string, number]> = {
 
 const suggestions = Object.keys(emotionMap);
 
-const dummyPosts: Post[] = [
-  {
-    id: 1,
-    userId: "yamada01",
-    userName: "山田太郎",
-    type: "photo",
-    content: "今日は楽しかった！",
-    photoUrl: "/images/sample1.jpg",
-    emotions: [{ emoji: "😭", count: 1229 }, { emoji: "✨", count: 448 }],
-  },
-  {
-    id: 2,
-    userId: "suzuki22",
-    userName: "鈴木花子",
-    type: "text",
-    content: "ちょっと悲しい気分",
-    emotions: [{ emoji: "😘", count: 300 }, { emoji: "💧", count: 200 }],
-  },
-  {
-    id: 3,
-    userId: "tanaka33",
-    userName: "田中一郎",
-    type: "photo",
-    content: "猫が可愛すぎる",
-    photoUrl: "/images/sample2.jpg",
-    emotions: [{ emoji: "😎", count: 800 }],
-  },
-];
-
 export default function SearchPage() {
   const [nameOrId, setNameOrId] = useState("");
   const [emotionQuery, setEmotionQuery] = useState("");
   const [results, setResults] = useState<Post[]>([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
-
+  const [currentUserId, setCurrentUserId] = useState("");
   const [showEmotionSuggestions, setShowEmotionSuggestions] = useState(false);
   const [showEmotionPopup, setShowEmotionPopup] = useState(false);
+
+  useEffect(() => {
+    const storedId = window.localStorage.getItem("emozyUserId") || "";
+    setCurrentUserId(storedId);
+  }, []);
 
   const filteredEmotionSuggestions = suggestions.filter(
     (word) => word.startsWith(emotionQuery) && emotionQuery !== ""
   );
 
+  /**
+   * APIから受け取った投稿データをPost型に変換する共通関数
+   */
+  const formatPost = (p: any, userName?: string): Post => {
+    const reaction_ids = p.num_reactions
+      ? Object.keys(p.num_reactions).map(id => Number(id))
+      : [];
+    const reaction_counts = p.num_reactions
+      ? Object.values(p.num_reactions)
+      : [];
+    return {
+      id: p.id,
+      user: userName || p.name, // 引数でuserNameが渡されればそれを使う
+      userIconUrl: "/images/mitei.png",
+      content: p.content,
+      imageUrl: p.image_url,
+      reaction_ids,
+      reaction_counts,
+      reacted_reaction_ids: p.reacted_reaction_ids || [],
+    };
+  };
+
+  /**
+   * 検索APIを呼び出す共通関数
+   */
+  const executeSearch = async () => {
+    if (!currentUserId) {
+      alert("ユーザー情報が取得できません。");
+      return null;
+    }
+    const reactionId = emotionMap[emotionQuery]?.[1] || null;
+    const res = await fetch("http://localhost:3333/api/v1/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        search: {
+          keyword: nameOrId || "",
+          reaction_id: reactionId,
+          user_id: currentUserId,
+        },
+      }),
+    });
+    if (!res.ok) throw new Error("検索APIに失敗しました");
+    return res.json();
+  };
+
+  /**
+   * 検索ボタンが押された時の処理
+   */
   const handleSearch = async () => {
     try {
-      const reactionId = emotionMap[emotionQuery]?.[1] || null;
+      const data = await executeSearch();
+      if (!data) return;
 
-      const res = await fetch("http://localhost:3333/api/v1/search", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          search: {
-            keyword: nameOrId || "",
-            reaction_id: reactionId,
-          },
-        }),
-      });
-
-      if (!res.ok) throw new Error("検索APIに失敗しました");
-      const data = await res.json();
-
-      console.log("APIレスポンス:", data);
-      // ユーザー検索結果をカード化
       const usersPostsFromApi: Post[] = (data.users || []).flatMap((u: any) =>
-        (u.posts || []).map((p: any) => {
-          const reaction_ids: number[] = [];
-          const reaction_counts: number[] = [];
-
-          for (let i = 1; i <= 12; i++) {
-            const key = `is_set_reaction_${i}`;
-            if (p[key] === true) {
-              reaction_ids.push(i);
-              reaction_counts.push(1);
-            }
-          }
-
-          return {
-            id: p.id,
-            user: u.name, // ← ユーザー名を使う
-            userIconUrl: "/images/mitei.png",
-            content: p.content,
-            imageUrl: p.image ? `/uploads/${p.image}` : undefined,
-            reaction_ids,
-            reaction_counts,
-            reacted_reaction_ids: [],
-          };
-        })
+        (u.posts || []).map((p: any) => formatPost(p, u.name))
       );
+      const postsFromApi: Post[] = (data.posts || []).map((p: any) => formatPost(p));
 
-
-      // 投稿検索結果を整形
-      const postsFromApi: Post[] = (data.posts || []).map((p: any) => {
-        const reaction_ids: number[] = [];
-        const reaction_counts: number[] = [];
-
-        for (let i = 1; i <= 12; i++) {
-          const key = `is_set_reaction_${i}`;
-          if (p[key] === true) {
-            reaction_ids.push(i);
-            reaction_counts.push(1);
-          }
-        }
-
-        return {
-          id: p.id,
-          user: p.name,
-          userIconUrl: "/images/mitei.png",
-          content: p.content,
-          imageUrl: p.image ? `/uploads/${p.image}` : undefined,
-          reaction_ids,
-          reaction_counts,
-          reacted_reaction_ids: [],
-        };
-      });
-
-
-      console.log("ユーザーの投稿:", usersPostsFromApi);
-      console.log("投稿検索結果:", postsFromApi);
-
-
-      // 両方をまとめる
+      // ユーザー検索結果と投稿検索結果をマージし、投稿IDで重複を削除
       const merged = [...usersPostsFromApi, ...postsFromApi];
-      setResults(merged.slice(0, 10));
-      setHasMore(merged.length > 10);
+      const uniquePosts = Array.from(new Map(merged.map(p => [p.id, p])).values());
+
+      setResults(uniquePosts.slice(0, 10));
+      setHasMore(uniquePosts.length > 10);
+      setPage(1); // 新しい検索なのでページ番号を1にリセット
     } catch (e) {
       console.error("❌ 検索失敗:", e);
     }
   };
 
+  /**
+   * 「もっと見る」が押された時の処理
+   */
   const handleLoadMore = async () => {
     try {
       const pageSize = 10;
       const nextPage = page + 1;
-      const reactionId = emotionMap[emotionQuery]?.[1] || null;
+      
+      const data = await executeSearch();
+      if (!data) return;
 
-      const res = await fetch("http://localhost:3333/api/v1/search", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          search: {
-            keyword: nameOrId || "",
-            reaction_id: reactionId,
-          },
-        }),
-      });
-
-      if (!res.ok) throw new Error("検索APIに失敗しました");
-      const data = await res.json();
-
-      // ユーザー投稿を展開してリアクション付きにする
       const usersPostsFromApi: Post[] = (data.users || []).flatMap((u: any) =>
-        (u.posts || []).map((p: any) => {
-          const reaction_ids: number[] = [];
-          const reaction_counts: number[] = [];
-
-          for (let i = 1; i <= 12; i++) {
-            const key = `is_set_reaction_${i}`;
-            if (p[key] === true) {
-              reaction_ids.push(i);
-              reaction_counts.push(1);
-            }
-          }
-
-          return {
-            id: p.id,
-            user: u.name,
-            userIconUrl: "/images/mitei.png",
-            content: p.content,
-            imageUrl: p.image ? `/uploads/${p.image}` : undefined,
-            reaction_ids,
-            reaction_counts,
-            reacted_reaction_ids: [],
-          };
-        })
+        (u.posts || []).map((p: any) => formatPost(p, u.name))
       );
+      const postsFromApi: Post[] = (data.posts || []).map((p: any) => formatPost(p));
 
-      // 投稿検索結果も同様に整形
-      const postsFromApi: Post[] = (data.posts || []).map((p: any) => {
-        const reaction_ids: number[] = [];
-        const reaction_counts: number[] = [];
-
-        for (let i = 1; i <= 12; i++) {
-          const key = `is_set_reaction_${i}`;
-          if (p[key] === true) {
-            reaction_ids.push(i);
-            reaction_counts.push(1);
-          }
-        }
-
-        return {
-          id: p.id,
-          user: p.name,
-          userIconUrl: "/images/mitei.png",
-          content: p.content,
-          imageUrl: p.image ? `/uploads/${p.image}` : undefined,
-          reaction_ids,
-          reaction_counts,
-          reacted_reaction_ids: [],
-        };
-      });
-
-      // 両方まとめて「もっと読む」処理
       const merged = [...usersPostsFromApi, ...postsFromApi];
-      const nextResults = merged.slice(0, nextPage * pageSize);
+      const uniquePosts = Array.from(new Map(merged.map(p => [p.id, p])).values());
+
+      const nextResults = uniquePosts.slice(0, nextPage * pageSize);
 
       setResults(nextResults);
       setPage(nextPage);
-      setHasMore(nextResults.length < merged.length);
+      setHasMore(nextResults.length < uniquePosts.length);
     } catch (e) {
       console.error("❌ もっと読む処理に失敗:", e);
-      alert("もっと読む処理に失敗しました");
     }
   };
 
+  // return (...) 以降のJSX部分は変更ありません
   return (
     <div style={{ background: "#f7f9fa", minHeight: "100vh" }}>
-      {/* ヘッダー（色は変えない） */}
+      {/* (header, main, footer のJSXは変更なし) */}
       <header
         style={{
           backgroundColor: "#7ADAD5",
@@ -270,13 +176,11 @@ export default function SearchPage() {
         </Link>
       </header>
 
-      {/* メイン */}
       <main style={{ padding: "24px", marginBottom: "120px", maxWidth: "800px", marginInline: "auto" }}>
         <h1 style={{ marginBottom: "16px", color: "#333", fontSize: "22px" }}>
           検索ページ
         </h1>
 
-        {/* 検索カード */}
         <div
           style={{
             background: "#fff",
@@ -333,7 +237,6 @@ export default function SearchPage() {
               ☺
             </button>
 
-            {/* サジェスト */}
             {showEmotionSuggestions &&
               filteredEmotionSuggestions.length > 0 && (
                 <ul
@@ -462,7 +365,6 @@ export default function SearchPage() {
         </div>
       </main>
 
-      {/* フッターは変更しない */}
       <footer
         style={{
           backgroundColor: "#f3f2f2ac",
