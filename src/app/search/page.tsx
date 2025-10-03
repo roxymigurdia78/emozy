@@ -4,30 +4,32 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import style from "./search.module.css";
+import Toukou from "../components/toukou";
 
 type Post = {
   id: number;
-  userId: string;
-  userName: string;
-  type: "photo" | "text";
+  user: string;
+  userIconUrl: string;
   content: string;
-  photoUrl?: string;
-  emotions: { emoji: string; count: number }[];
+  imageUrl?: string;
+  reaction_ids: number[];
+  reaction_counts: number[];
+  reacted_reaction_ids: number[];
 };
 
-const emotionMap: Record<string, string> = {
-  "かっこいい": "😎",
-  "かなしい": "😭",
-  "うれしい": "😃",
-  "いらいら": "😤",
-  "おもしろい": "🤣",
-  "がっかり": "😩",
-  "こわい": "☹️",
-  "しあわせ": "😊",
-  "ふざけたい": "😜",
-  "おこる": "😡",
-  "たのしい": "😆",
-  "かわいい": "😘",
+const emotionMap: Record<string, [string, number]> = {
+  "かっこいい": ["😎", 1],
+  "かなしい": ["😭", 2],
+  "うれしい": ["😃", 3],
+  "いらいら": ["😤", 4],
+  "おもしろい": ["🤣", 5],
+  "がっかり": ["😩", 6],
+  "こわい": ["☹️", 7],
+  "しあわせ": ["😊", 8],
+  "ふざけたい": ["😜", 9],
+  "おこる": ["😡", 10],
+  "たのしい": ["😆", 11],
+  "かわいい": ["😘", 1],
 };
 
 const suggestions = Object.keys(emotionMap);
@@ -75,57 +77,173 @@ export default function SearchPage() {
     (word) => word.startsWith(emotionQuery) && emotionQuery !== ""
   );
 
-  const handleSearch = () => {
-    let filtered = [...dummyPosts];
+  const handleSearch = async () => {
+    try {
+      const reactionId = emotionMap[emotionQuery]?.[1] || null;
 
-    if (nameOrId) {
-      filtered = filtered.filter(
-        (post) =>
-          post.userId.includes(nameOrId) || post.userName.includes(nameOrId)
-      );
+      const res = await fetch("http://localhost:3333/api/v1/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          search: {
+            keyword: nameOrId || "",
+            reaction_id: reactionId,
+          },
+        }),
+      });
+
+      if (!res.ok) throw new Error("検索APIに失敗しました");
+      const data = await res.json();
+
+      console.log("APIレスポンス:", data);
+      // ユーザー検索結果をカード化
+      const usersFromApi = (data.users || []).map((u: any) => {
+        const reaction_ids: number[] = [];
+        const reaction_counts: number[] = [];
+
+        // 投稿と同じように 1〜12 をチェック
+        for (let i = 1; i <= 12; i++) {
+          const key = `is_set_reaction_${i}`;
+          if (u[key] === true) {
+            reaction_ids.push(i);
+            reaction_counts.push(1);
+          }
+        }
+
+        return {
+          id: u.id,
+          user: u.name,
+          userIconUrl: "/images/mitei.png",
+          content: u.profile || "",
+          imageUrl: undefined,
+          reaction_ids,
+          reaction_counts,
+          reacted_reaction_ids: [],
+        };
+      });
+
+      // 投稿検索結果を整形
+      const postsFromApi = (data.posts || []).map((p: any) => {
+        // リアクションIDと件数を boolean から変換
+        const reaction_ids: number[] = [];
+        const reaction_counts: number[] = [];
+
+        for (let i = 1; i <= 12; i++) {
+          const key = `is_set_reaction_${i}`;
+          if (p[key] === true) {
+            reaction_ids.push(i);
+            // APIが件数を返していないので「true=1件 / false=0件」として仮で扱う
+            reaction_counts.push(p[key] ? 1 : 0);
+          }
+        }
+
+        return {
+          id: p.id,
+          user: p.name,
+          userIconUrl: "/images/mitei.png",
+          content: p.content,
+          imageUrl: p.image ? `/uploads/${p.image}` : undefined,
+          reaction_ids,
+          reaction_counts,
+          reacted_reaction_ids: [], // ← あればここも boolean から導ける
+        };
+      });
+
+
+      console.log("✅ postsFromApi:", postsFromApi);
+
+
+      // 両方をまとめる
+      const merged = [...usersFromApi, ...postsFromApi];
+      setResults(merged.slice(0, 10));
+      setHasMore(merged.length > 10);
+    } catch (e) {
+      console.error("❌ 検索失敗:", e);
     }
-
-    if (emotionQuery) {
-      const targetEmoji = emotionMap[emotionQuery] || emotionQuery;
-      filtered = filtered.filter((post) =>
-        post.emotions.some((emo) => emo.emoji === targetEmoji)
-      );
-    }
-
-    const pageSize = 10;
-    const pagePosts = filtered.slice(0, pageSize);
-
-    setResults(pagePosts);
-    setPage(1);
-    setHasMore(pagePosts.length < filtered.length);
-    setShowEmotionSuggestions(false);
-    setShowEmotionPopup(false);
   };
 
-  const handleLoadMore = () => {
-    const pageSize = 10;
-    const nextPage = page + 1;
+  const handleLoadMore = async () => {
+    try {
+      const pageSize = 10;
+      const nextPage = page + 1;
+      const reactionId = emotionMap[emotionQuery]?.[1] || null;
 
-    let filtered = [...dummyPosts];
+      const res = await fetch("http://localhost:3333/api/v1/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          search: {
+            keyword: nameOrId || "",
+            reaction_id: reactionId,
+          },
+        }),
+      });
 
-    if (nameOrId) {
-      filtered = filtered.filter(
-        (post) =>
-          post.userId.includes(nameOrId) || post.userName.includes(nameOrId)
-      );
+      if (!res.ok) throw new Error("検索APIに失敗しました");
+      const data = await res.json();
+
+      // handleSearch と同じ整形処理を再利用
+      const usersFromApi = (data.users || []).map((u: any) => {
+        const reaction_ids: number[] = [];
+        const reaction_counts: number[] = [];
+
+        // 投稿と同じように 1〜12 をチェック
+        for (let i = 1; i <= 12; i++) {
+          const key = `is_set_reaction_${i}`;
+          if (u[key] === true) {
+            reaction_ids.push(i);
+            reaction_counts.push(1);
+          }
+        }
+
+        return {
+          id: u.id,
+          user: u.name,
+          userIconUrl: "/images/mitei.png",
+          content: u.profile || "",
+          imageUrl: undefined,
+          reaction_ids,
+          reaction_counts,
+          reacted_reaction_ids: [],
+        };
+      });
+
+      console.log("📦 data.posts:", data.posts);
+
+      const postsFromApi = (data.posts || []).map((p: any) => {
+        const reaction_ids: number[] = [];
+        const reaction_counts: number[] = [];
+
+        for (let i = 1; i <= 12; i++) {
+          const key = `is_set_reaction_${i}`;
+          if (p[key] === true) {
+            reaction_ids.push(i);
+            reaction_counts.push(1); // 仮で1件として扱う
+          }
+        }
+
+        return {
+          id: p.id,
+          user: p.name,
+          userIconUrl: "/images/mitei.png",
+          content: p.content,
+          imageUrl: p.image ? `/uploads/${p.image}` : undefined,
+          reaction_ids,
+          reaction_counts,
+          reacted_reaction_ids: [], // 必要ならここも true のIDを入れる
+        };
+      });
+
+      const merged = [...usersFromApi, ...postsFromApi];
+      const nextResults = merged.slice(0, nextPage * pageSize);
+
+      setResults(nextResults);
+      setPage(nextPage);
+      setHasMore(nextResults.length < merged.length);
+    } catch (e) {
+      console.error(e);
+      alert("もっと読む処理に失敗しました");
     }
-
-    if (emotionQuery) {
-      const targetEmoji = emotionMap[emotionQuery] || emotionQuery;
-      filtered = filtered.filter((post) =>
-        post.emotions.some((emo) => emo.emoji === targetEmoji)
-      );
-    }
-
-    const nextResults = filtered.slice(0, nextPage * pageSize);
-    setResults(nextResults);
-    setPage(nextPage);
-    setHasMore(nextResults.length < filtered.length);
   };
 
   return (
@@ -248,7 +366,7 @@ export default function SearchPage() {
                         setShowEmotionSuggestions(false);
                       }}
                     >
-                      {s} {emotionMap[s]}
+                      {s} {emotionMap[s][0]}
                     </li>
                   ))}
                 </ul>
@@ -290,7 +408,7 @@ export default function SearchPage() {
                       setShowEmotionPopup(false);
                     }}
                   >
-                    {emoji}
+                    {emoji[0]}
                   </button>
                 ))}
               </div>
@@ -315,57 +433,13 @@ export default function SearchPage() {
           </button>
         </div>
 
-        {/* 結果 */}
         <div style={{ marginTop: "20px" }}>
           {results.length === 0 ? (
             <p style={{ textAlign: "center", color: "#666" }}>
               検索結果はありません
             </p>
           ) : (
-            results.map((post) => (
-              <div
-                key={post.id}
-                style={{
-                  borderBottom: "1px solid #eee", // ✅ 区切り線だけ
-                  padding: "12px 0",              // ✅ 余白を上下につける
-                }}
-              >
-              <div style={{ display: "flex", alignItems: "center", paddingBottom: "6px" }}>
-                <Image
-                  src="/images/mitei.png"
-                  alt="usericon"
-                  width={32}
-                  height={32}
-                  style={{ borderRadius: "50%" }}
-                />
-                <span style={{ marginLeft: "8px", fontWeight: "bold" }}>
-                  {post.userName}
-                </span>
-              </div>
-
-                {post.type === "photo" ? (
-                  <Image
-                    src={post.photoUrl!}
-                    alt="post"
-                    width={500}
-                    height={300}
-                    style={{ width: "100%", height: "auto" }}
-                  />
-                ) : (
-                  <p style={{ padding: "16px", fontSize: "16px" }}>
-                    {post.content}
-                  </p>
-                )}
-
-                <div style={{ display: "flex", padding: "12px", gap: "16px" }}>
-                  {post.emotions.map((emo, idx) => (
-                    <span key={idx} style={{ fontSize: "18px" }}>
-                      {emo.emoji} {emo.count}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ))
+            results.map((post) => <Toukou key={post.id} post={post} />)
           )}
 
           {hasMore && (
