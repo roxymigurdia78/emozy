@@ -32,33 +32,34 @@ export default function Home() {
             cache: "no-store",
             keepalive: false,
             mode: "cors",
-        })
+            })
             .then(res => res.json())
             .then(data => {
-            console.log("APIレスポンス:", data);
-            const posts = (data as ApiPost[]).map((item) => {
-                const reaction_ids = item.num_reactions
-                ? Object.keys(item.num_reactions).map(id => Number(id))
-                : [1, 2, 3];
-                const reaction_counts = item.num_reactions
-                ? Object.values(item.num_reactions)
-                : [0, 0, 0];
-                return {
-                id: item.id,
-                user: item.name,
-                userIconUrl: "/images/title.png",
-                content: item.content,
-                imageUrl: item.image_url,
-                reaction_ids,
-                reaction_counts,
-                reacted_reaction_ids: item.reacted_reaction_ids || [], // ← nullなら空配列
-                };
-            });
-            setPosts(posts);
+                 
+                console.log("APIレスポンス:", data);
+                // Toukou用に変換
+                const posts = (data as ApiPost[]).map((item) => {
+                    const reaction_ids = item.num_reactions 
+                    ? Object.keys(item.num_reactions).map(id => Number(id))
+                     : [1,2,3];
+                    const reaction_counts = item.num_reactions 
+                    ? Object.values(item.num_reactions) 
+                    : [0,0,0];
+                    return {
+                        id: item.id,
+                        user:  item.name,
+                        userIconUrl: "/images/title.png", // 仮アイコン
+                        content: item.content,
+                        imageUrl: item.image_url,
+                        reaction_ids,
+                        reaction_counts,
+                        reacted_reaction_ids: item.reacted_reaction_ids || [], // ← nullなら空配列
+                    };
+                });
+                setPosts(posts);
             })
             .catch(err => console.error("投稿取得エラー", err));
-        }, []);
-
+    }, []);
 
   return (
     <div>
@@ -119,10 +120,7 @@ export default function Home() {
             style={{ marginLeft: "0px", marginTop: "10px", marginBottom: "15px", marginRight: "0px", minWidth: "65px", minHeight: "65px" }}
         />
     </Link>
-    <Link
-        href={currentUserId ? `/post?userId=${encodeURIComponent(currentUserId)}` : "/post"}
-        style={{ display: "flex", alignItems: "flex-end", height: "100px", flexShrink: 0, flexGrow: 0 }}
-    >
+    <Link href="post" style={{ display: "flex", alignItems: "flex-end", height: "100px", flexShrink: 0, flexGrow: 0 }}>
         <Image
             src="/images/toukouicon.png"
             alt="posticon"
