@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
+import Link from "next/link";
 
 export default function MakeProfilePage() {
     const router = useRouter();
@@ -128,6 +129,10 @@ export default function MakeProfilePage() {
 
                 {/* Profile creation form */}
                 <div style={styles.formContainer}>
+                    {/* [変更] ×ボタンを追加 */}
+                    <Link href="/setting">
+                        <button className="text-black text-2xl font-bold hover:text-red-500 transition-colors" aria-label="閉じる">×</button>
+                    </Link>
                     <h1 style={styles.title}>
                        プロフィールを
                        <br></br>
