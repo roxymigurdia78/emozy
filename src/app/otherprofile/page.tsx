@@ -19,36 +19,32 @@ type User = {
 
 export default function page() {
     const [user, setUser] = useState<User | null>(null);
-    useEffect(() => {
-        fetch("http://localhost:3333/api/v1/users/10")
-            .then((res) => res.json())
-            .then((data) => setUser(data));
-    }, []);
+        const [post, setPost] = useState(null);
+            useEffect(() => {
+                fetch("http://localhost:3333/api/v1/users/10")
+                    .then((res) => res.json())
+                    .then((data) => setUser(data));
+                fetch("http://localhost:3333/api/v1/posts/1")
+                    .then((res) => res.json())
+                    .then((data) => {
+                        // num_reactions → reaction_ids/reaction_counts へ変換
+                        let reaction_ids: number[] = [];
+                        let reaction_counts: number[] = [];
+                        if (data.num_reactions) {
+                            reaction_ids = Object.keys(data.num_reactions).map(id => Number(id));
+                            reaction_counts = Object.values(data.num_reactions);
+                        }
+                        setPost({
+                            ...data,
+                            reaction_ids,
+                            reaction_counts,
+                        });
+                    });
+            }, []);
 
-        const posts = [
-        {
-            id: 1,
-            user: "roxymigurdia78",
-            userIconUrl: "/images/title.png",
-            content: "ああ",
-            imageUrl: "/images/title.png",
-            emotions: [],
-            reaction_ids: [],
-        },
-        {
-            id: 2,
-            user: "Saaaaa",
-            userIconUrl: "/images/title.png",
-            content: "今日のぶどうは甘かったわー",
-            emotions: [],
-            reaction_ids: [],
-        },
-       
-  ];
-
-  return (
-    <div>
-                        <div style={{ width: "100%", padding: "24px 0 8px 8px", fontWeight: "bold", fontSize: "30px", color: "#222", position: "relative", display: "flex", alignItems: "center", gap: "3px" }}>
+    return (
+        <div>
+                        <div style={{ width: "100%", padding: "24px 0 8px 8px", fontWeight: "bold", fontSize: "30px", color: "#222", position: "relative", display: "flex", alignItems: "center", gap: "5px" }}>
                     <Link href="/home" aria-label="ホームへ戻る" style={{ display: "inline-flex", alignItems: "center" }}>
                         <Image
                             src="/images/kigou.png"
@@ -80,9 +76,7 @@ export default function page() {
             </div>
 
     <main style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: "0" }}>
-        {posts.map((post) => (
-                    <Toukou key={post.id} post={post} />
-        ))}
+        {post && <Toukou post={post} />}
     </main>
 
 
@@ -147,6 +141,6 @@ export default function page() {
 
 
 
-    </div>
-  )
+        </div>
+    );
 }
