@@ -44,6 +44,7 @@ const ICON_PARTS_ENDPOINT = "http://localhost:3333/api/v1/icon_parts";
 const ICON_SAVE_ENDPOINT = "http://localhost:3333/api/v1/icon_maker/save";
 const ICON_MAKE_ENDPOINT = "http://localhost:3333/api/v1/icon_maker/make_icon";
 const BACKGROUND_ACQUIRE_ENDPOINT = "http://localhost:3333/api/v1/background_list/acquire";
+const FRAME_ACQUIRE_ENDPOINT = "http://localhost:3333/api/v1/frame_list/acquire";
 const USER_ENDPOINT = "http://localhost:3333/api/v1/users";
 const ASSET_BASE_URL = "http://localhost:3333";
 const DEFAULT_USER_ID = 14; // 仮のユーザーID（APIリクエストで使用）
@@ -118,6 +119,8 @@ export default function Page() {
   const [ownershipMap, setOwnershipMap] = useState<Record<string, Record<string, boolean>>>({});
   // 背景アイテムの詳細リスト
   const [backgroundAssets, setBackgroundAssets] = useState<OwnedAsset[]>([]);
+  // フレームアイテムの詳細リスト
+  const [frameAssets, setFrameAssets] = useState<OwnedAsset[]>([]);
   // パーツ取得中のターゲット（二重押下防止）
   const [acquiringTarget, setAcquiringTarget] = useState<{ part: string; optionId: number } | null>(null);
   // 取得処理に関するステータスメッセージ
@@ -166,6 +169,7 @@ export default function Page() {
             }, {});
           };
           setBackgroundAssets(data.background_images ?? []);
+          setFrameAssets(data.frame_images ?? []);
           applyOwnership(data.background_images, "background");
           applyOwnership(data.frame_images, "frame");
           if (data.icon_parts.background) {
@@ -330,13 +334,13 @@ export default function Page() {
     setSelectedPartIds((prev) => ({ ...prev, [part]: option.id }));
   }, []);
 
-  // 背景パーツの取得APIを叩き、成功した場合は所持情報を更新
+  // 背景・フレームの取得APIを叩き、成功した場合は所持情報を更新
   const acquirePart = useCallback(
     async (part: string, option: IconPart) => {
       if (!part) return false;
       setPurchaseError(null);
       setPurchaseMessage(null);
-      if (part !== "background") {
+      if (part !== "background" && part !== "frame") {
         setPurchaseError("このパーツは購入に対応していません。");
         return false;
       }
@@ -347,11 +351,15 @@ export default function Page() {
         return false;
       }
 
-      const targetAsset = backgroundAssets.find(
+      const assetList = part === "background" ? backgroundAssets : frameAssets;
+      const endpoint = part === "background" ? BACKGROUND_ACQUIRE_ENDPOINT : FRAME_ACQUIRE_ENDPOINT;
+      const payloadKey = part === "background" ? "background_image_id" : "frame_image_id";
+
+      const targetAsset = assetList.find(
         (asset) => normalizeImageKey(asset.image) === normalizedKey
       );
       if (!targetAsset) {
-        setPurchaseError("該当する背景アイテムが見つかりません。");
+        setPurchaseError("該当するパーツが見つかりません。");
         return false;
       }
 
@@ -392,28 +400,28 @@ export default function Page() {
 
       setAcquiringTarget({ part, optionId: option.id });
       try {
-        const response = await fetch(BACKGROUND_ACQUIRE_ENDPOINT, {
+        const response = await fetch(endpoint, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
             user_id: DEFAULT_USER_ID,
-            background_image_id: targetAsset.id,
+            [payloadKey]: targetAsset.id,
           }),
         });
 
         if (!response.ok) {
-          let message = `背景を取得できませんでした: ${response.status}`;
-          try {
-            const errorJson = await response.json();
-            if (typeof errorJson?.message === "string") {
-              message = errorJson.message;
-            }
-          } catch {
-            const text = await response.text();
-            if (text) {
-              message = text;
+          let message = `${PART_LABELS[part] ?? part}を取得できませんでした: ${response.status}`;
+          const rawBody = await response.text();
+          if (rawBody) {
+            try {
+              const errorJson = JSON.parse(rawBody);
+              if (typeof errorJson?.message === "string") {
+                message = errorJson.message;
+              }
+            } catch {
+              message = rawBody;
             }
           }
           throw new Error(message);
@@ -427,11 +435,19 @@ export default function Page() {
           },
         }));
 
-        setBackgroundAssets((prev) =>
-          prev.map((asset) =>
-            normalizeImageKey(asset.image) === normalizedKey ? { ...asset, owned: true } : asset
-          )
-        );
+        if (part === "background") {
+          setBackgroundAssets((prev) =>
+            prev.map((asset) =>
+              normalizeImageKey(asset.image) === normalizedKey ? { ...asset, owned: true } : asset
+            )
+          );
+        } else {
+          setFrameAssets((prev) =>
+            prev.map((asset) =>
+              normalizeImageKey(asset.image) === normalizedKey ? { ...asset, owned: true } : asset
+            )
+          );
+        }
 
         setParts((prev) => {
           const category = prev[part] ?? [];
@@ -449,14 +465,14 @@ export default function Page() {
         setUserPoint(remainingPoints);
         return true;
       } catch (err) {
-        const message = err instanceof Error ? err.message : "背景の取得に失敗しました。";
+        const message = err instanceof Error ? err.message : `${PART_LABELS[part] ?? part}の取得に失敗しました。`;
         setPurchaseError(message);
         return false;
       } finally {
         setAcquiringTarget(null);
       }
     },
-    [backgroundAssets, isUserLoading, normalizeImageKey, userPoint]
+    [backgroundAssets, frameAssets, isUserLoading, normalizeImageKey, userPoint]
   );
 
   const handleOptionClick = useCallback(
