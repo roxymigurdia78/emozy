@@ -17,6 +17,8 @@ type IconPartsResponse = {
 };
 
 const ICON_PARTS_ENDPOINT = "http://localhost:3333/api/v1/icon_parts";
+const ICON_SAVE_ENDPOINT = "http://localhost:3333/api/v1/icon_maker/save";
+const ICON_MAKE_ENDPOINT = "http://localhost:3333/api/v1/icon_maker/make_icon";
 const ASSET_BASE_URL = "http://localhost:3333";
 const DEFAULT_USER_ID = 1;
 const PART_ORDER = [
@@ -64,8 +66,11 @@ export default function Page() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const tabsRef = useRef<HTMLDivElement | null>(null);
+  const tabButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchIconParts = async () => {
@@ -157,17 +162,78 @@ export default function Page() {
     });
   };
 
+  const focusPartTab = useCallback((part: string) => {
+    const targetButton = tabButtonRefs.current[part];
+    if (targetButton) {
+      targetButton.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+      targetButton.focus({ preventScroll: true });
+    }
+  }, []);
+
   const handleSelect = (part: string, option: IconPart) => {
     setSelectedPartIds((prev) => ({ ...prev, [part]: option.id }));
   };
 
-  const selectionPayload = useMemo(
-    () => ({
+  const selectionPayload = useMemo(() => {
+    const filteredIconParts = Object.fromEntries(
+      Object.entries(selectedPartIds).filter(([, value]) => typeof value === "number" && value > 0)
+    );
+
+    return {
       user_id: DEFAULT_USER_ID,
-      icon_parts: selectedPartIds,
-    }),
-    [selectedPartIds]
-  );
+      icon_parts: filteredIconParts,
+    };
+  }, [selectedPartIds]);
+
+  const handleComplete = useCallback(async () => {
+    setSaveError(null);
+    const iconPartCount = Object.keys(selectionPayload.icon_parts).length;
+    if (iconPartCount === 0) {
+      setSaveError("パーツを選択してください。");
+      return;
+    }
+
+    const missingPart = PART_ORDER.find((part) => !Object.prototype.hasOwnProperty.call(selectionPayload.icon_parts, part));
+    if (missingPart) {
+      const label = PART_LABELS[missingPart] ?? missingPart;
+      setSaveError(`${label}を選択してください。`);
+      setActivePart(missingPart);
+      focusPartTab(missingPart);
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const payloadJson = JSON.stringify(selectionPayload);
+      const requestInit: RequestInit = {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: payloadJson,
+      };
+
+      const saveResponse = await fetch(ICON_SAVE_ENDPOINT, requestInit);
+      if (!saveResponse.ok) {
+        throw new Error(`icon_maker/save API でエラーが発生しました: ${saveResponse.status}`);
+      }
+
+      const makeResponse = await fetch(ICON_MAKE_ENDPOINT, {
+        ...requestInit,
+        body: payloadJson,
+      });
+      if (!makeResponse.ok) {
+        throw new Error(`icon_maker/make_icon API でエラーが発生しました: ${makeResponse.status}`);
+      }
+
+      router.push("/profile");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "API 呼び出しに失敗しました";
+      setSaveError(message);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [router, selectionPayload]);
 
   const activeOptions = activePart ? parts[activePart] ?? [] : [];
   const activeSelectionId = activePart ? selectedPartIds[activePart] : undefined;
@@ -252,9 +318,9 @@ export default function Page() {
             paddingBottom: "10px",
           }}
         >
-          <button
-            type="button"
-            onClick={() => scrollTabs("left")}
+        <button
+          type="button"
+          onClick={() => scrollTabs("left")}
             disabled={!canScrollLeft}
             style={{
               width: "36px",
@@ -288,6 +354,9 @@ export default function Page() {
               <button
                 key={key}
                 type="button"
+                ref={(el) => {
+                  tabButtonRefs.current[key] = el;
+                }}
                 style={{
                   padding: "10px 22px",
                   fontSize: "16px",
@@ -307,9 +376,9 @@ export default function Page() {
               </button>
             ))}
           </div>
-          <button
-            type="button"
-            onClick={() => scrollTabs("right")}
+        <button
+          type="button"
+          onClick={() => scrollTabs("right")}
             disabled={!canScrollRight}
             style={{
               width: "36px",
@@ -377,6 +446,9 @@ export default function Page() {
             <div style={{ fontWeight: "bold", marginBottom: "4px" }}>選択データ</div>
             <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{JSON.stringify(selectionPayload, null, 2)}</pre>
           </div>
+          {saveError && (
+            <p style={{ color: "#d9534f", marginTop: "12px" }}>{saveError}</p>
+          )}
         </div>
       </div>
       {/* きせかえ完了ボタン */}
@@ -408,12 +480,12 @@ export default function Page() {
             letterSpacing: "2px",
             transition: "all 0.2s",
           }}
+          disabled={isSaving}
           onClick={() => {
-            console.log("Selected icon parts payload", selectionPayload);
-            router.push("/profile");
+            void handleComplete();
           }}
         >
-          きせかえ完了
+          {isSaving ? "保存中..." : "きせかえ完了"}
         </button>
       </div>
     </div>
