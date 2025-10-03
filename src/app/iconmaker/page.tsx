@@ -28,11 +28,25 @@ type IconPartsResponse = {
   frame_images?: OwnedAsset[];
 };
 
+type UserProfile = {
+  id: number;
+  name: string;
+  email: string;
+  profile: string | null;
+  point: number;
+  background_id: number | null;
+  frame_id: number | null;
+  created_at: string;
+  updated_at: string;
+};
+
 const ICON_PARTS_ENDPOINT = "http://localhost:3333/api/v1/icon_parts";
 const ICON_SAVE_ENDPOINT = "http://localhost:3333/api/v1/icon_maker/save";
 const ICON_MAKE_ENDPOINT = "http://localhost:3333/api/v1/icon_maker/make_icon";
+const BACKGROUND_ACQUIRE_ENDPOINT = "http://localhost:3333/api/v1/background_list/acquire";
+const USER_ENDPOINT = "http://localhost:3333/api/v1/users";
 const ASSET_BASE_URL = "http://localhost:3333";
-const DEFAULT_USER_ID = 12; // 仮のユーザーID
+const DEFAULT_USER_ID = 14; // 仮のユーザーID（APIリクエストで使用）
 
 // パーツの優先順位
 const PART_ORDER = [
@@ -102,6 +116,16 @@ export default function Page() {
   const [saveError, setSaveError] = useState<string | null>(null);
   // 背景・フレームの所持状況を画像パス単位で保持
   const [ownershipMap, setOwnershipMap] = useState<Record<string, Record<string, boolean>>>({});
+  // 背景アイテムの詳細リスト
+  const [backgroundAssets, setBackgroundAssets] = useState<OwnedAsset[]>([]);
+  // パーツ取得中のターゲット（二重押下防止）
+  const [acquiringTarget, setAcquiringTarget] = useState<{ part: string; optionId: number } | null>(null);
+  // 取得処理に関するステータスメッセージ
+  const [purchaseMessage, setPurchaseMessage] = useState<string | null>(null);
+  const [purchaseError, setPurchaseError] = useState<string | null>(null);
+  // ユーザーの所持ポイント
+  const [userPoint, setUserPoint] = useState<number | null>(null);
+  const [isUserLoading, setIsUserLoading] = useState(false);
 
   const normalizeImageKey = useCallback((imagePath: string) => {
     if (!imagePath) return "";
@@ -115,6 +139,9 @@ export default function Page() {
     const fetchIconParts = async () => {
       setIsLoading(true);
       setError(null);
+      setPurchaseMessage(null);
+      setPurchaseError(null);
+      setAcquiringTarget(null);
       try {
         // 取得時にキャッシュを無効化し、追加された最新パーツが即時反映されるようにする
         const response = await fetch(`${ICON_PARTS_ENDPOINT}?user_id=${DEFAULT_USER_ID}`, {
@@ -126,8 +153,6 @@ export default function Page() {
 
         const data = (await response.json()) as IconPartsResponse;
         if (data?.icon_parts) {
-          // APIレスポンスのパーツ一覧を保持
-          setParts(data.icon_parts);
           // 背景・フレームの所持情報をマップ化して保存
           const ownedEntries: Record<string, Record<string, boolean>> = {};
           const applyOwnership = (items: OwnedAsset[] | undefined, category: string) => {
@@ -140,9 +165,24 @@ export default function Page() {
               return acc;
             }, {});
           };
+          setBackgroundAssets(data.background_images ?? []);
           applyOwnership(data.background_images, "background");
           applyOwnership(data.frame_images, "frame");
+          if (data.icon_parts.background) {
+            data.icon_parts.background = data.icon_parts.background.map((item) => ({
+              ...item,
+              owned: ownedEntries.background?.[normalizeImageKey(item.image)] ?? item.owned,
+            }));
+          }
+          if (data.icon_parts.frame) {
+            data.icon_parts.frame = data.icon_parts.frame.map((item) => ({
+              ...item,
+              owned: ownedEntries.frame?.[normalizeImageKey(item.image)] ?? item.owned,
+            }));
+          }
           setOwnershipMap(ownedEntries);
+          // APIレスポンスのパーツ一覧を保持（所持情報を付与した後のデータ）
+          setParts(data.icon_parts);
           // 既存の選択状態をクリアする（初期表示では空）
           setSelectedPartIds({});
           const keys = Object.keys(data.icon_parts);
@@ -161,6 +201,29 @@ export default function Page() {
 
     void fetchIconParts();
   }, [normalizeImageKey]);
+
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      setIsUserLoading(true);
+      try {
+        const response = await fetch(`${USER_ENDPOINT}/${DEFAULT_USER_ID}`, {
+          cache: "no-store",
+        });
+        if (!response.ok) {
+          throw new Error(`ユーザー情報の取得に失敗しました: ${response.status}`);
+        }
+        const data = (await response.json()) as UserProfile;
+        setUserPoint(typeof data.point === "number" ? data.point : 0);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "ユーザー情報を取得できませんでした。";
+        setPurchaseError(message);
+      } finally {
+        setIsUserLoading(false);
+      }
+    };
+
+    void fetchUserProfile();
+  }, []);
 
   const partKeys = useMemo(() => {
     const keys = Object.keys(parts);
@@ -183,6 +246,12 @@ export default function Page() {
       setActivePart(partKeys[0]);
     }
   }, [activePart, partKeys]);
+
+  useEffect(() => {
+    if (!activePart) return;
+    setPurchaseMessage(null);
+    setPurchaseError(null);
+  }, [activePart]);
 
   const updateTabScrollState = useCallback(() => {
     const container = tabsRef.current;
@@ -234,6 +303,7 @@ export default function Page() {
     }
   }, []);
 
+  // 背景・フレームを含めてパーツが所持済みかどうかを判定
   const isPartOwned = useCallback(
     (part: string, option: IconPart) => {
       if (!part) return true;
@@ -255,10 +325,157 @@ export default function Page() {
     [normalizeImageKey, ownershipMap]
   );
 
-  const handleSelect = (part: string, option: IconPart) => {
-    if (!isPartOwned(part, option)) return;
+  // 所持済みのパーツを選択状態として保存
+  const handleSelect = useCallback((part: string, option: IconPart) => {
     setSelectedPartIds((prev) => ({ ...prev, [part]: option.id }));
-  };
+  }, []);
+
+  // 背景パーツの取得APIを叩き、成功した場合は所持情報を更新
+  const acquirePart = useCallback(
+    async (part: string, option: IconPart) => {
+      if (!part) return false;
+      setPurchaseError(null);
+      setPurchaseMessage(null);
+      if (part !== "background") {
+        setPurchaseError("このパーツは購入に対応していません。");
+        return false;
+      }
+
+      const normalizedKey = normalizeImageKey(option.image);
+      if (!normalizedKey) {
+        setPurchaseError("購入対象の画像パスが不正です。");
+        return false;
+      }
+
+      const targetAsset = backgroundAssets.find(
+        (asset) => normalizeImageKey(asset.image) === normalizedKey
+      );
+      if (!targetAsset) {
+        setPurchaseError("該当する背景アイテムが見つかりません。");
+        return false;
+      }
+
+      if (isUserLoading) {
+        setPurchaseError("ユーザー情報を取得しています。少し待ってから再度お試しください。");
+        return false;
+      }
+
+      if (userPoint === null) {
+        setPurchaseError("ユーザーの所持ポイントを取得できませんでした。");
+        return false;
+      }
+
+      const currentPoints = userPoint;
+      const cost = targetAsset.point ?? 0;
+      const remainingPoints = currentPoints - cost;
+
+      if (remainingPoints < 0) {
+        setPurchaseError(
+          `ポイントが不足しています。（所持: ${currentPoints} / 必要: ${cost}）`
+        );
+        return false;
+      }
+
+      const confirmMessage = [
+        `${PART_LABELS[part] ?? part}を購入しますか？`,
+        "",
+        `所持ポイント: ${currentPoints}`,
+        `消費ポイント: ${cost}`,
+        `購入後ポイント: ${remainingPoints}`,
+      ].join("\n");
+
+      const confirmed = window.confirm(confirmMessage);
+      if (!confirmed) {
+        setPurchaseMessage("購入をキャンセルしました。");
+        return false;
+      }
+
+      setAcquiringTarget({ part, optionId: option.id });
+      try {
+        const response = await fetch(BACKGROUND_ACQUIRE_ENDPOINT, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            user_id: DEFAULT_USER_ID,
+            background_image_id: targetAsset.id,
+          }),
+        });
+
+        if (!response.ok) {
+          let message = `背景を取得できませんでした: ${response.status}`;
+          try {
+            const errorJson = await response.json();
+            if (typeof errorJson?.message === "string") {
+              message = errorJson.message;
+            }
+          } catch {
+            const text = await response.text();
+            if (text) {
+              message = text;
+            }
+          }
+          throw new Error(message);
+        }
+
+        setOwnershipMap((prev) => ({
+          ...prev,
+          [part]: {
+            ...(prev[part] ?? {}),
+            [normalizedKey]: true,
+          },
+        }));
+
+        setBackgroundAssets((prev) =>
+          prev.map((asset) =>
+            normalizeImageKey(asset.image) === normalizedKey ? { ...asset, owned: true } : asset
+          )
+        );
+
+        setParts((prev) => {
+          const category = prev[part] ?? [];
+          const updatedCategory = category.map((item) =>
+            item.id === option.id ? { ...item, owned: true } : item
+          );
+          return {
+            ...prev,
+            [part]: updatedCategory,
+          };
+        });
+
+        setPurchaseMessage(`${PART_LABELS[part] ?? part}を取得しました。`);
+        setSelectedPartIds((prev) => ({ ...prev, [part]: option.id }));
+        setUserPoint(remainingPoints);
+        return true;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "背景の取得に失敗しました。";
+        setPurchaseError(message);
+        return false;
+      } finally {
+        setAcquiringTarget(null);
+      }
+    },
+    [backgroundAssets, isUserLoading, normalizeImageKey, userPoint]
+  );
+
+  const handleOptionClick = useCallback(
+    async (part: string, option: IconPart) => {
+      if (!part) return;
+      if (acquiringTarget && acquiringTarget.part === part && acquiringTarget.optionId === option.id) {
+        return;
+      }
+      if (isPartOwned(part, option)) {
+        setPurchaseError(null);
+        setPurchaseMessage(null);
+        handleSelect(part, option);
+        return;
+      }
+
+      await acquirePart(part, option);
+    },
+    [acquirePart, acquiringTarget, handleSelect, isPartOwned]
+  );
 
   const selectionPayload = useMemo(() => {
     // 選択済みIDのみを抽出してpayloadを構築する
@@ -323,7 +540,7 @@ export default function Page() {
     } finally {
       setIsSaving(false);
     }
-  }, [router, selectionPayload]);
+  }, [focusPartTab, router, selectionPayload]);
 
   const activeOptions = activePart ? parts[activePart] ?? [] : [];
   const activeSelectionId = activePart ? selectedPartIds[activePart] : undefined;
@@ -504,19 +721,27 @@ export default function Page() {
                 const optionSrc = resolveImageSrc(option.image, option.updated_at);
                 const isSelected = activeSelectionId === option.id;
                 const isOwned = isPartOwned(activePart ?? "", option);
+                const isAcquiring =
+                  acquiringTarget?.part === (activePart ?? "") && acquiringTarget?.optionId === option.id;
                 const disabledStyle = !isOwned
                   ? {
                       filter: "grayscale(100%)",
                       opacity: 0.5,
-                      cursor: "not-allowed" as const,
+                      cursor: isAcquiring ? ("wait" as const) : ("not-allowed" as const),
                     }
                   : {};
+                const clickHandler = () => {
+                  if (isAcquiring) return;
+                  void handleOptionClick(activePart ?? "", option);
+                };
                 return (
                   <div
                     key={option.id}
                     style={{
                       position: "relative",
+                      cursor: isOwned ? "pointer" : isAcquiring ? "wait" : "not-allowed",
                     }}
+                    onClick={clickHandler}
                   >
                     <Image
                       key={`${option.id}-img`}
@@ -527,15 +752,10 @@ export default function Page() {
                       style={{
                         border: isSelected ? "3px solid #4a90e2" : "2px solid #eee",
                         borderRadius: "18px",
-                        cursor: isOwned ? "pointer" : "not-allowed",
                         background: "#fafafa",
                         boxShadow: isSelected ? "0 2px 8px #b3d8ff" : "0 1px 4px #eee",
                         transition: "all 0.2s",
                         ...disabledStyle,
-                      }}
-                      onClick={() => {
-                        if (!isOwned) return;
-                        handleSelect(activePart ?? "", option);
                       }}
                     />
                     {!isOwned && (
@@ -551,9 +771,10 @@ export default function Page() {
                           fontWeight: "bold",
                           background: "rgba(0,0,0,0.35)",
                           borderRadius: "18px",
+                          pointerEvents: "none",
                         }}
                       >
-                        未所持
+                        {isAcquiring ? "購入中..." : "未所持"}
                       </div>
                     )}
                   </div>
@@ -574,6 +795,12 @@ export default function Page() {
             <div style={{ fontWeight: "bold", marginBottom: "4px" }}>選択データ</div>
             <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{JSON.stringify(selectionPayload, null, 2)}</pre>
           </div>
+          {purchaseMessage && (
+            <p style={{ color: "#2f7a37", marginTop: "12px" }}>{purchaseMessage}</p>
+          )}
+          {purchaseError && (
+            <p style={{ color: "#d9534f", marginTop: "8px" }}>{purchaseError}</p>
+          )}
           {saveError && (
             <p style={{ color: "#d9534f", marginTop: "12px" }}>{saveError}</p>
           )}
