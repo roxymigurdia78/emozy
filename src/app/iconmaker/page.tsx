@@ -10,17 +10,31 @@ type IconPart = {
   image: string;
   created_at: string;
   updated_at: string;
+  owned?: boolean;
+};
+
+type OwnedAsset = {
+  id: number;
+  image: string;
+  point: number;
+  created_at: string;
+  updated_at: string;
+  owned: boolean;
 };
 
 type IconPartsResponse = {
   icon_parts: Record<string, IconPart[]>;
+  background_images?: OwnedAsset[];
+  frame_images?: OwnedAsset[];
 };
 
 const ICON_PARTS_ENDPOINT = "http://localhost:3333/api/v1/icon_parts";
 const ICON_SAVE_ENDPOINT = "http://localhost:3333/api/v1/icon_maker/save";
 const ICON_MAKE_ENDPOINT = "http://localhost:3333/api/v1/icon_maker/make_icon";
 const ASSET_BASE_URL = "http://localhost:3333";
-const DEFAULT_USER_ID = 1;
+const DEFAULT_USER_ID = 12; // 仮のユーザーID
+
+// パーツの優先順位
 const PART_ORDER = [
   "background",
   "skin",
@@ -49,45 +63,91 @@ const PART_LABELS: Record<string, string> = {
   frame: "フレーム",
 };
 
-const resolveImageSrc = (imagePath: string) => {
+// 画像URLを生成する関数。updatedAt が指定されていればキャッシュ回避用クエリを付与する
+const resolveImageSrc = (imagePath: string, updatedAt?: string) => {
   if (!imagePath) return "";
+  const timestamp = updatedAt ? new Date(updatedAt).getTime() : undefined;
+  const versionSuffix = typeof timestamp === "number" && !Number.isNaN(timestamp) ? `?t=${timestamp}` : "";
   if (imagePath.startsWith("http://") || imagePath.startsWith("https://")) {
-    return imagePath;
+    return `${imagePath}${versionSuffix}`;
   }
   const normalized = imagePath.startsWith("/") ? imagePath.slice(1) : imagePath;
-  return `${ASSET_BASE_URL}/${normalized}`;
+  const base = `${ASSET_BASE_URL}/${normalized}`;
+  return `${base}${versionSuffix}`;
 };
 
 export default function Page() {
   const router = useRouter();
+  // APIから取得したパーツをカテゴリ毎に保持
   const [parts, setParts] = useState<Record<string, IconPart[]>>({});
+  // 現在選択中のカテゴリ
   const [activePart, setActivePart] = useState<string | null>(null);
+  // 各カテゴリに紐づく選択済みパーツID
   const [selectedPartIds, setSelectedPartIds] = useState<Record<string, number>>({});
+  // パーツ取得中かどうか
   const [isLoading, setIsLoading] = useState(true);
+  // パーツ取得時のエラーメッセージ
   const [error, setError] = useState<string | null>(null);
+  // タブコンテナの参照（横スクロール制御用）
   const tabsRef = useRef<HTMLDivElement | null>(null);
+  // 各タブボタンの参照（不足時にフォーカス移動するため）
   const tabButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  // タブを左方向にスクロールできるかどうか
   const [canScrollLeft, setCanScrollLeft] = useState(false);
+  // タブを右方向にスクロールできるかどうか
   const [canScrollRight, setCanScrollRight] = useState(false);
+  // 保存API呼び出し中かどうか
   const [isSaving, setIsSaving] = useState(false);
+  // 保存時のエラーメッセージ
   const [saveError, setSaveError] = useState<string | null>(null);
+  // 背景・フレームの所持状況を画像パス単位で保持
+  const [ownershipMap, setOwnershipMap] = useState<Record<string, Record<string, boolean>>>({});
+
+  const normalizeImageKey = useCallback((imagePath: string) => {
+    if (!imagePath) return "";
+    return imagePath
+      .replace(/^rails\/?public\/?/i, "")
+      .replace(/^public\/?/i, "")
+      .replace(/^\//, "");
+  }, []);
 
   useEffect(() => {
     const fetchIconParts = async () => {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await fetch(ICON_PARTS_ENDPOINT, { cache: "no-store" });
+        // 取得時にキャッシュを無効化し、追加された最新パーツが即時反映されるようにする
+        const response = await fetch(`${ICON_PARTS_ENDPOINT}?user_id=${DEFAULT_USER_ID}`, {
+          cache: "no-store",
+        });
         if (!response.ok) {
           throw new Error(`Failed to fetch icon parts: ${response.status}`);
         }
 
         const data = (await response.json()) as IconPartsResponse;
         if (data?.icon_parts) {
+          // APIレスポンスのパーツ一覧を保持
           setParts(data.icon_parts);
+          // 背景・フレームの所持情報をマップ化して保存
+          const ownedEntries: Record<string, Record<string, boolean>> = {};
+          const applyOwnership = (items: OwnedAsset[] | undefined, category: string) => {
+            if (!items?.length) return;
+            ownedEntries[category] = items.reduce<Record<string, boolean>>((acc, item) => {
+              const key = normalizeImageKey(item.image);
+              if (key) {
+                acc[key] = item.owned;
+              }
+              return acc;
+            }, {});
+          };
+          applyOwnership(data.background_images, "background");
+          applyOwnership(data.frame_images, "frame");
+          setOwnershipMap(ownedEntries);
+          // 既存の選択状態をクリアする（初期表示では空）
           setSelectedPartIds({});
           const keys = Object.keys(data.icon_parts);
           if (keys.length > 0) {
+            // 最初のカテゴリを選択状態にする
             setActivePart(keys[0]);
           }
         }
@@ -100,10 +160,11 @@ export default function Page() {
     };
 
     void fetchIconParts();
-  }, []);
+  }, [normalizeImageKey]);
 
   const partKeys = useMemo(() => {
     const keys = Object.keys(parts);
+    // PART_ORDER を優先しつつ、定義外のキーは名前順で後ろに並べる
     const prioritized = keys.sort((a, b) => {
       const indexA = PART_ORDER.indexOf(a);
       const indexB = PART_ORDER.indexOf(b);
@@ -152,16 +213,19 @@ export default function Page() {
     updateTabScrollState();
   }, [partKeys, updateTabScrollState]);
 
+  // タブのスクロール制御。方向に応じて一定距離スクロールする
   const scrollTabs = (direction: "left" | "right") => {
     const container = tabsRef.current;
     if (!container) return;
     const delta = container.offsetWidth * 0.8;
+    // 画面幅の約8割をスクロールさせ、隠れたタブを素早く表示する
     container.scrollBy({
       left: direction === "left" ? -delta : delta,
       behavior: "smooth",
     });
   };
 
+  // 指定したパーツのタブ要素へスクロールしフォーカスする
   const focusPartTab = useCallback((part: string) => {
     const targetButton = tabButtonRefs.current[part];
     if (targetButton) {
@@ -170,11 +234,34 @@ export default function Page() {
     }
   }, []);
 
+  const isPartOwned = useCallback(
+    (part: string, option: IconPart) => {
+      if (!part) return true;
+      if (part !== "background" && part !== "frame") {
+        return option.owned ?? true;
+      }
+      if (typeof option.owned === "boolean") {
+        return option.owned;
+      }
+      const categoryMap = ownershipMap[part];
+      if (!categoryMap) return true;
+      const key = normalizeImageKey(option.image);
+      if (!key) return true;
+      if (Object.prototype.hasOwnProperty.call(categoryMap, key)) {
+        return categoryMap[key];
+      }
+      return true;
+    },
+    [normalizeImageKey, ownershipMap]
+  );
+
   const handleSelect = (part: string, option: IconPart) => {
+    if (!isPartOwned(part, option)) return;
     setSelectedPartIds((prev) => ({ ...prev, [part]: option.id }));
   };
 
   const selectionPayload = useMemo(() => {
+    // 選択済みIDのみを抽出してpayloadを構築する
     const filteredIconParts = Object.fromEntries(
       Object.entries(selectedPartIds).filter(([, value]) => typeof value === "number" && value > 0)
     );
@@ -193,11 +280,13 @@ export default function Page() {
       return;
     }
 
+    // 未選択のカテゴリがあればユーザーに選択を促す
     const missingPart = PART_ORDER.find((part) => !Object.prototype.hasOwnProperty.call(selectionPayload.icon_parts, part));
     if (missingPart) {
       const label = PART_LABELS[missingPart] ?? missingPart;
       setSaveError(`${label}を選択してください。`);
       setActivePart(missingPart);
+      // 該当タブへスクロール＆フォーカスして入力を促す
       focusPartTab(missingPart);
       return;
     }
@@ -213,6 +302,7 @@ export default function Page() {
         body: payloadJson,
       };
 
+      // 先に選択内容を保存してからアイコン生成APIを呼び出す
       const saveResponse = await fetch(ICON_SAVE_ENDPOINT, requestInit);
       if (!saveResponse.ok) {
         throw new Error(`icon_maker/save API でエラーが発生しました: ${saveResponse.status}`);
@@ -282,7 +372,8 @@ export default function Page() {
                 if (!selectedId) return null;
                 const matchedPart = parts[part]?.find((item) => item.id === selectedId);
                 if (!matchedPart) return null;
-                const src = resolveImageSrc(matchedPart.image);
+                if (!isPartOwned(part, matchedPart)) return null;
+                const src = resolveImageSrc(matchedPart.image, matchedPart.updated_at);
                 return (
                   <div
                     key={`${part}-${selectedId}`}
@@ -410,25 +501,62 @@ export default function Page() {
             )}
             {!isLoading && !error &&
               activeOptions.map((option) => {
-                const optionSrc = resolveImageSrc(option.image);
+                const optionSrc = resolveImageSrc(option.image, option.updated_at);
                 const isSelected = activeSelectionId === option.id;
+                const isOwned = isPartOwned(activePart ?? "", option);
+                const disabledStyle = !isOwned
+                  ? {
+                      filter: "grayscale(100%)",
+                      opacity: 0.5,
+                      cursor: "not-allowed" as const,
+                    }
+                  : {};
                 return (
-                  <Image
+                  <div
                     key={option.id}
-                    src={optionSrc}
-                    alt={PART_LABELS[activePart ?? ""] ?? ""}
-                    width={72}
-                    height={72}
                     style={{
-                      border: isSelected ? "3px solid #4a90e2" : "2px solid #eee",
-                      borderRadius: "18px",
-                      cursor: "pointer",
-                      background: "#fafafa",
-                      boxShadow: isSelected ? "0 2px 8px #b3d8ff" : "0 1px 4px #eee",
-                      transition: "all 0.2s",
+                      position: "relative",
                     }}
-                    onClick={() => handleSelect(activePart ?? "", option)}
-                  />
+                  >
+                    <Image
+                      key={`${option.id}-img`}
+                      src={optionSrc}
+                      alt={PART_LABELS[activePart ?? ""] ?? ""}
+                      width={72}
+                      height={72}
+                      style={{
+                        border: isSelected ? "3px solid #4a90e2" : "2px solid #eee",
+                        borderRadius: "18px",
+                        cursor: isOwned ? "pointer" : "not-allowed",
+                        background: "#fafafa",
+                        boxShadow: isSelected ? "0 2px 8px #b3d8ff" : "0 1px 4px #eee",
+                        transition: "all 0.2s",
+                        ...disabledStyle,
+                      }}
+                      onClick={() => {
+                        if (!isOwned) return;
+                        handleSelect(activePart ?? "", option);
+                      }}
+                    />
+                    {!isOwned && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          inset: 0,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          color: "#fff",
+                          fontSize: "12px",
+                          fontWeight: "bold",
+                          background: "rgba(0,0,0,0.35)",
+                          borderRadius: "18px",
+                        }}
+                      >
+                        未所持
+                      </div>
+                    )}
+                  </div>
                 );
               })}
           </div>
