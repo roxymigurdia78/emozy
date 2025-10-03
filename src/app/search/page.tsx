@@ -97,34 +97,35 @@ export default function SearchPage() {
 
       console.log("APIレスポンス:", data);
       // ユーザー検索結果をカード化
-      const usersFromApi = (data.users || []).map((u: any) => {
-        const reaction_ids: number[] = [];
-        const reaction_counts: number[] = [];
+      const usersPostsFromApi: Post[] = (data.users || []).flatMap((u: any) =>
+        (u.posts || []).map((p: any) => {
+          const reaction_ids: number[] = [];
+          const reaction_counts: number[] = [];
 
-        // 投稿と同じように 1〜12 をチェック
-        for (let i = 1; i <= 12; i++) {
-          const key = `is_set_reaction_${i}`;
-          if (u[key] === true) {
-            reaction_ids.push(i);
-            reaction_counts.push(1);
+          for (let i = 1; i <= 12; i++) {
+            const key = `is_set_reaction_${i}`;
+            if (p[key] === true) {
+              reaction_ids.push(i);
+              reaction_counts.push(1);
+            }
           }
-        }
 
-        return {
-          id: u.id,
-          user: u.name,
-          userIconUrl: "/images/mitei.png",
-          content: u.profile || "",
-          imageUrl: undefined,
-          reaction_ids,
-          reaction_counts,
-          reacted_reaction_ids: [],
-        };
-      });
+          return {
+            id: p.id,
+            user: u.name, // ← ユーザー名を使う
+            userIconUrl: "/images/mitei.png",
+            content: p.content,
+            imageUrl: p.image ? `/uploads/${p.image}` : undefined,
+            reaction_ids,
+            reaction_counts,
+            reacted_reaction_ids: [],
+          };
+        })
+      );
+
 
       // 投稿検索結果を整形
-      const postsFromApi = (data.posts || []).map((p: any) => {
-        // リアクションIDと件数を boolean から変換
+      const postsFromApi: Post[] = (data.posts || []).map((p: any) => {
         const reaction_ids: number[] = [];
         const reaction_counts: number[] = [];
 
@@ -132,8 +133,7 @@ export default function SearchPage() {
           const key = `is_set_reaction_${i}`;
           if (p[key] === true) {
             reaction_ids.push(i);
-            // APIが件数を返していないので「true=1件 / false=0件」として仮で扱う
-            reaction_counts.push(p[key] ? 1 : 0);
+            reaction_counts.push(1);
           }
         }
 
@@ -145,16 +145,17 @@ export default function SearchPage() {
           imageUrl: p.image ? `/uploads/${p.image}` : undefined,
           reaction_ids,
           reaction_counts,
-          reacted_reaction_ids: [], // ← あればここも boolean から導ける
+          reacted_reaction_ids: [],
         };
       });
 
 
-      console.log("✅ postsFromApi:", postsFromApi);
+      console.log("ユーザーの投稿:", usersPostsFromApi);
+      console.log("投稿検索結果:", postsFromApi);
 
 
       // 両方をまとめる
-      const merged = [...usersFromApi, ...postsFromApi];
+      const merged = [...usersPostsFromApi, ...postsFromApi];
       setResults(merged.slice(0, 10));
       setHasMore(merged.length > 10);
     } catch (e) {
@@ -182,35 +183,35 @@ export default function SearchPage() {
       if (!res.ok) throw new Error("検索APIに失敗しました");
       const data = await res.json();
 
-      // handleSearch と同じ整形処理を再利用
-      const usersFromApi = (data.users || []).map((u: any) => {
-        const reaction_ids: number[] = [];
-        const reaction_counts: number[] = [];
+      // ユーザー投稿を展開してリアクション付きにする
+      const usersPostsFromApi: Post[] = (data.users || []).flatMap((u: any) =>
+        (u.posts || []).map((p: any) => {
+          const reaction_ids: number[] = [];
+          const reaction_counts: number[] = [];
 
-        // 投稿と同じように 1〜12 をチェック
-        for (let i = 1; i <= 12; i++) {
-          const key = `is_set_reaction_${i}`;
-          if (u[key] === true) {
-            reaction_ids.push(i);
-            reaction_counts.push(1);
+          for (let i = 1; i <= 12; i++) {
+            const key = `is_set_reaction_${i}`;
+            if (p[key] === true) {
+              reaction_ids.push(i);
+              reaction_counts.push(1);
+            }
           }
-        }
 
-        return {
-          id: u.id,
-          user: u.name,
-          userIconUrl: "/images/mitei.png",
-          content: u.profile || "",
-          imageUrl: undefined,
-          reaction_ids,
-          reaction_counts,
-          reacted_reaction_ids: [],
-        };
-      });
+          return {
+            id: p.id,
+            user: u.name,
+            userIconUrl: "/images/mitei.png",
+            content: p.content,
+            imageUrl: p.image ? `/uploads/${p.image}` : undefined,
+            reaction_ids,
+            reaction_counts,
+            reacted_reaction_ids: [],
+          };
+        })
+      );
 
-      console.log("📦 data.posts:", data.posts);
-
-      const postsFromApi = (data.posts || []).map((p: any) => {
+      // 投稿検索結果も同様に整形
+      const postsFromApi: Post[] = (data.posts || []).map((p: any) => {
         const reaction_ids: number[] = [];
         const reaction_counts: number[] = [];
 
@@ -218,7 +219,7 @@ export default function SearchPage() {
           const key = `is_set_reaction_${i}`;
           if (p[key] === true) {
             reaction_ids.push(i);
-            reaction_counts.push(1); // 仮で1件として扱う
+            reaction_counts.push(1);
           }
         }
 
@@ -230,18 +231,19 @@ export default function SearchPage() {
           imageUrl: p.image ? `/uploads/${p.image}` : undefined,
           reaction_ids,
           reaction_counts,
-          reacted_reaction_ids: [], // 必要ならここも true のIDを入れる
+          reacted_reaction_ids: [],
         };
       });
 
-      const merged = [...usersFromApi, ...postsFromApi];
+      // 両方まとめて「もっと読む」処理
+      const merged = [...usersPostsFromApi, ...postsFromApi];
       const nextResults = merged.slice(0, nextPage * pageSize);
 
       setResults(nextResults);
       setPage(nextPage);
       setHasMore(nextResults.length < merged.length);
     } catch (e) {
-      console.error(e);
+      console.error("❌ もっと読む処理に失敗:", e);
       alert("もっと読む処理に失敗しました");
     }
   };
