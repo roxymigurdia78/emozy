@@ -186,7 +186,7 @@ export default function page() {
     return (
         <div>
             <div style={{ width: "100%", padding: "24px 0 8px 24px", fontWeight: "bold", fontSize: "30px", color: "#222", position: "relative" }}>
-                {user ? user.name : "..."}
+                {/* {user ? user.name : "..."} */}
                 <Link href="/setting">
                     <img
                         src="/images/settei.png"
@@ -218,11 +218,11 @@ export default function page() {
                         />
                     )}
                 </div>
-                {/* <div style={{ marginLeft: "32px", display: "flex", flexDirection: "column", gap: "10px" }}>
+                <div style={{ marginLeft: "32px", display: "flex", flexDirection: "column", gap: "10px" }}>
                     <span style={{ fontWeight: "bold", fontSize: "20px", color: "#222" }}>
                         {user ? user.name : "..."}
                     </span>
-                </div> */}
+                </div>
             </div>
             {/* プロフィール（自己紹介文）追加 */}
             <div style={{ paddingLeft: "23px", paddingRight: "24px", marginBottom: "10px", color: "#333", fontSize: "17px" }}>
