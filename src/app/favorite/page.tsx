@@ -31,7 +31,7 @@ export default function FavoritePage() { // コンポーネント名を変更
                 const favoritePostsFromApi: any[] = await res.json();
                 
                 // APIから受け取ったデータを、Toukouコンポーネントが扱える形式(Post型)に変換する
-                const formattedPosts = favoritePostsFromApi.map((item) g=> {
+                const formattedPosts = favoritePostsFromApi.map((item) => {
                     const reaction_ids = item.num_reactions
                         ? Object.keys(item.num_reactions).map(id => Number(id))
                         : [];
