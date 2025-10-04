@@ -1,82 +1,148 @@
 "use client";
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Toukou from "../components/toukou";
-import { useEffect } from "react";
 import type { Post } from "../components/toukou";
+
 export default function Page() {
-    // 初期表示で全ランキング取得
-    useEffect(() => {
-        const fetchRanking = async () => {
-            try {
-                const res = await fetch("http://localhost:3333/api/v1/ranking");
-                const data = await res.json();
-                const posts = Array.isArray(data) ? data.map((item: any) => {
-                    const reaction_ids = item.num_reactions ? Object.keys(item.num_reactions).map(id => Number(id)) : [1,2,3];
-                    const reaction_counts = item.num_reactions ? Object.values(item.num_reactions) : [0,0,0];
-                    return {
-                        id: item.id,
-                        user: `user${item.user_id}`,
-                        userIconUrl: "/images/title.png",
-                        content: item.content,
-                        imageUrl: item.image_url,
-                        reaction_ids,
-                        reaction_counts,
-                    };
-                }) : [];
-                setPosts(posts);
-            } catch (e) {
-                console.error("ランキング取得失敗", e);
-                setPosts([]);
-            }
-        };
-        fetchRanking();
-    }, []);
-    const emotions = [
-        "😎", "😭", "😃", "😤", "🤣", "😩", "☹️", "😊", "😜", "😡", "😆", "😘"
-    ];
+    const [currentUserId, setCurrentUserId] = useState("");
     const [selectedEmotion, setSelectedEmotion] = useState("");
     const [showPopup, setShowPopup] = useState(false);
     const [posts, setPosts] = useState<any[]>([]);
 
-    // 絵文字選択時にAPIから投稿取得（POST）
-    const handleEmotionSelect = async (emotion: string) => {
-        setSelectedEmotion(emotion);
-        setShowPopup(false);
-        const emotionId = emotions.indexOf(emotion) + 1;
+    // ✅ ユーザーIDを localStorage から取得
+    useEffect(() => {
+        const storedId = window.localStorage.getItem("emozyUserId") || "";
+        setCurrentUserId(storedId);
+    }, []);
+
+    // ✅ currentUserId を使ってランキング取得（IDが取れてから）
+    useEffect(() => {
+        if (!currentUserId) return;
+
+        const fetchRanking = async () => {
         try {
-            const body = {
-                ranking: {  reaction_id: emotionId, limit: 50 }
+            const res = await fetch(`http://localhost:3333/api/v1/ranking?user_id=${currentUserId}`);
+            const json = await res.json();
+            console.log("GETランキングレスポンス:", json);
+
+            const list = Array.isArray(json) ? json : json.ranking || json.posts || [];
+            const posts = list.map((item: any) => {
+            const reaction_ids = item.num_reactions
+                ? Object.keys(item.num_reactions).map((id) => Number(id))
+                : [1, 2, 3];
+            const reaction_counts = item.num_reactions
+                ? Object.values(item.num_reactions)
+                : [0, 0, 0];
+            return {
+                id: item.id,
+                user: item.name || `user${item.user_id}`,
+                userIconUrl: "/images/title.png",
+                content: item.content,
+                imageUrl: item.image_url,
+                reaction_ids,
+                reaction_counts,
+                reacted_reaction_ids: item.reacted_reaction_ids || [],
+                num_reactions: item.num_reactions || {},
             };
-            console.log("送信JSON:", body);
-            const res = await fetch("http://localhost:3333/api/v1/ranking", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(body)
             });
-            const data = await res.json();
-            console.log("POSTレスポンス:", data);
-            // Toukou用データに変換（/homeのロジック流用）
-            const posts = Array.isArray(data) ? data.map((item: any) => {
-                const reaction_ids = item.num_reactions ? Object.keys(item.num_reactions).map(id => Number(id)) : [1,2,3];
-                const reaction_counts = item.num_reactions ? Object.values(item.num_reactions) : [0,0,0];
-                return {
-                    id: item.id,
-                    user: `user${item.user_id}`,
-                    userIconUrl: "/images/title.png", // 仮アイコン
-                    content: item.content,
-                    imageUrl: item.image_url,
-                    reaction_ids,
-                    reaction_counts,
-                };
-            }) : [];
             setPosts(posts);
         } catch (e) {
             console.error("ランキング取得失敗", e);
             setPosts([]);
         }
+        };
+
+        fetchRanking();
+    }, [currentUserId]);
+
+    const emotions = ["😎", "😭", "😃", "😤", "🤣", "😩", "☹️", "😊", "😜", "😡", "😆", "😘"];
+
+    // 絵文字選択時のPOST処理
+    const handleEmotionSelect = async (emotion: string) => {
+        setSelectedEmotion(emotion);
+        setShowPopup(false);
+        if (!currentUserId) return; // ← 保険
+
+        const emotionId = emotions.indexOf(emotion) + 1;
+        try {
+        if (!currentUserId) {
+            console.warn("⚠️ currentUserId が空なので POST 中止");
+            return;
+        }
+        const body = {
+            ranking: { reaction_id: emotionId, limit: 50 },
+            user_id: currentUserId,
+        };
+        console.log("送信JSON:", body);
+        const res = await fetch(`http://localhost:3333/api/v1/ranking?user_id=${currentUserId}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        console.log("POSTレスポンス:", data);
+
+        const posts = Array.isArray(data)
+            ? data.map((item: any) => {
+                const reaction_ids = item.num_reactions
+                ? Object.keys(item.num_reactions).map((id) => Number(id))
+                : [1, 2, 3];
+                const reaction_counts = item.num_reactions
+                ? Object.values(item.num_reactions)
+                : [0, 0, 0];
+                return {
+                id: item.id,
+                user: item.name || `user${item.user_id}`,
+                userIconUrl: "/images/title.png",
+                content: item.content,
+                imageUrl: item.image_url,
+                reaction_ids,
+                reaction_counts,
+                reacted_reaction_ids: item.reacted_reaction_ids || [],
+                num_reactions: item.num_reactions || {},
+                };
+            })
+            : [];
+        setPosts(posts);
+        } catch (e) {
+        console.error("ランキング取得失敗", e);
+        setPosts([]);
+        }
     };
+
+    // 投稿ごとのリアクション送信関数
+    const handleReaction = async (postId: number, reactionId: number) => {
+        if (!currentUserId) return;
+        try {
+            const res = await fetch(`http://localhost:3333/api/v1/posts/${postId}/reactions`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user_id: currentUserId, reaction_id: reactionId }),
+            });
+            const data = await res.json();
+            console.log("リアクション送信成功:", data);
+
+            // ✅ 再取得して最新状態を反映
+            const refresh = await fetch(`http://localhost:3333/api/v1/ranking?user_id=${currentUserId}`);
+            const refreshedJson = await refresh.json();
+            const list = Array.isArray(refreshedJson) ? refreshedJson : refreshedJson.ranking || [];
+            setPosts(list.map((item: any) => ({
+            id: item.id,
+            user: item.name || `user${item.user_id}`,
+            userIconUrl: "/images/title.png",
+            content: item.content,
+            imageUrl: item.image_url,
+            reaction_ids: item.num_reactions ? Object.keys(item.num_reactions).map(Number) : [1,2,3],
+            reaction_counts: item.num_reactions ? Object.values(item.num_reactions) : [0,0,0],
+            reacted_reaction_ids: item.reacted_reaction_ids || [],
+            })));
+        } catch (err) {
+            console.error("リアクション送信失敗:", err);
+        }
+    };
+
     return (
         <div>
             <header style={{
@@ -210,11 +276,6 @@ export default function Page() {
         />
     </Link>
     </footer>
-
-
-
     </div>
-    
-    
   );
 }
