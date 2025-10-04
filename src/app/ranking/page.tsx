@@ -158,7 +158,7 @@ export default function Page() {
                     <div style={{ minWidth: "150px", maxWidth: "150px", display: "flex", alignItems: "center" }}>
                         <Link href="/home" >
                             <Image 
-                                src="/images/title.png"
+                                src="/images/emozy_logo.png"
                                 alt="title"
                                 width={150}
                                 height={150}
@@ -209,7 +209,7 @@ export default function Page() {
                 </div>
             </header>
 
-            <main style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: "0" }}>
+            <main style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: "0", paddingBottom: "90px" }}>
                 {posts.length === 0 ? (
                     <div style={{ color: "#888", marginTop: "32px" }}>絵文字を選択してください。</div>
                 ) : (

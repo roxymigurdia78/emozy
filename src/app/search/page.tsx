@@ -168,7 +168,7 @@ export default function SearchPage() {
         </Link>
       </header>
 
-      <main style={{ padding: "24px", marginBottom: "120px", maxWidth: "800px", marginInline: "auto" }}>
+      <main style={{ padding: "24px", paddingBottom: "90px", maxWidth: "800px", marginInline: "auto" }}>
         <h1 style={{ marginBottom: "16px", color: "#333", fontSize: "22px" }}>
           検索ページ
         </h1>
