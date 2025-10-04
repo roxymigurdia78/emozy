@@ -205,11 +205,11 @@ export default function page() {
                         />
                     )}
                 </div>
-                <div style={{ marginLeft: "32px", display: "flex", flexDirection: "column", gap: "10px" }}>
+                {/* <div style={{ marginLeft: "32px", display: "flex", flexDirection: "column", gap: "10px" }}>
                     <span style={{ fontWeight: "bold", fontSize: "20px", color: "#222" }}>
                         {user ? user.name : "..."}
                     </span>
-                </div>
+                </div> */}
             </div>
             {/* プロフィール（自己紹介文）追加 */}
             <div style={{ paddingLeft: "23px", paddingRight: "24px", marginBottom: "10px", color: "#333", fontSize: "17px" }}>
