@@ -11,10 +11,11 @@ export type Post = {
   reaction_ids: number[];
   reaction_counts?: number[]; // 各絵文字のリアクション数
   reacted_reaction_ids?: number[];
+  is_favorited?: boolean;
 };
 
 export default function Toukou({ post }: { post: Post }) {
-  const [hearted, setHearted] = useState(false);
+  const [isFavorited, setIsFavorited] = useState(post.is_favorited || false);
   const [showMenu, setShowMenu] = useState(false);
   // 絵文字ボタンの押下状態（複数選択可）
   const [selectedIdx, setSelectedIdx] = useState<number[]>([]);
@@ -35,6 +36,7 @@ export default function Toukou({ post }: { post: Post }) {
     if (storedId) {
       setUserId(storedId);
     }
+    setIsFavorited(post.is_favorited || false);
 
     // reacted_reaction_ids の初期選択状態
     const reactedIds = post.reacted_reaction_ids || [];
@@ -42,7 +44,45 @@ export default function Toukou({ post }: { post: Post }) {
       .map((id, idx) => reactedIds.includes(id) ? idx : null)
       .filter((idx): idx is number => idx !== null);
     setSelectedIdx(initialSelected);
-  }, [post.reacted_reaction_ids, post.reaction_ids]);
+  }, [post.reacted_reaction_ids, post.reaction_ids, post.is_favorited]); 
+
+  // お気に入り登録/解除を行う関数
+  const handleFavorite = async () => {
+    if (!userId) {
+      alert("ユーザー情報が見つかりません。");
+      return;
+    }
+
+    const endpoint = isFavorited ? "/api/v1/favorites/delete" : "/api/v1/favorites";
+    
+    // UIを即時反映（オプティミスティックUI）
+    setIsFavorited(!isFavorited);
+
+    try {
+      const res = await fetch(`http://localhost:3333${endpoint}`, {
+        method: "POST", // deleteもPOSTで送るAPI仕様のため
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          favorite: {
+            user_id: Number(userId),
+            post_id: postId,
+          },
+        }),
+      });
+
+      if (!res.ok) {
+        // エラー時はUIを元に戻す
+        setIsFavorited(isFavorited);
+        throw new Error("お気に入り操作に失敗しました");
+      }
+      
+      console.log("お気に入り操作成功");
+
+    } catch (error) {
+      console.error(error);
+      alert("お気に入り操作に失敗しました。");
+    }
+  };
 
   return (
     <div style={{
@@ -55,7 +95,7 @@ export default function Toukou({ post }: { post: Post }) {
     }}>
       <div style={{ display: "flex", alignItems: "center", marginBottom: "8px", position: "relative" }}>
         <Image
-          src={post.userIconUrl}
+          src={post.userIconUrl || "/images/title.png"}
           alt="user icon"
           width={40}
           height={40}
@@ -172,13 +212,17 @@ export default function Toukou({ post }: { post: Post }) {
           );
         })}
       </div>
-        <div style={{ position: "absolute", right: "13px", bottom: "8px", cursor: "pointer" }} onClick={() => setHearted(!hearted)}>
+        <div style={{ position: "absolute", right: "13px", bottom: "8px", cursor: "pointer" }} onClick={handleFavorite}>
           <Image
             src="/images/heart.png"
             alt="heart"
             width={28}
             height={28}
-            style={{ filter: hearted ? "invert(17%) sepia(99%) saturate(7491%) hue-rotate(-1deg) brightness(1.1)" : "grayscale(80%) brightness(1.2)" }}
+            style={{ 
+            filter: isFavorited 
+              ? "invert(17%) sepia(99%) saturate(7491%) hue-rotate(330deg) brightness(1.1)" // 赤色っぽくする
+              : "grayscale(80%) brightness(1.2)" 
+          }}
           />
         </div>
     </div>

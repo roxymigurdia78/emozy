@@ -17,6 +17,7 @@ type ApiPost = {
     reaction_ids: number[];
     num_reactions?: { [id: string]: number };
     reacted_reaction_ids?: number[];
+    is_favorited?: boolean;
 };
 export default function Home() {
 
@@ -51,7 +52,8 @@ export default function Home() {
                 imageUrl: item.image_url,
                 reaction_ids,
                 reaction_counts,
-                reacted_reaction_ids: item.reacted_reaction_ids || [], // ← nullなら空配列
+                reacted_reaction_ids: item.reacted_reaction_ids || [], 
+                is_favorited: !!item.is_favorited,
                 };
             });
             setPosts(posts);
