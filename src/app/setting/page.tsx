@@ -96,6 +96,11 @@ export default function SettingPage() {
                         アイコン選択
                     </button>
                 </Link>
+                <Link href="/iconmaker">
+                    <button className="w-full bg-white text-black text-lg py-5 rounded-xl shadow-md transition hover:bg-[#6ac5c0]">
+                        アイコンメーカー
+                    </button>
+                </Link>
                 <Link href="/make">
                     <button className="w-full bg-white text-black text-lg py-5 rounded-xl shadow-md transition hover:bg-[#6ac5c0]">
                         名前・プロフィール設定
