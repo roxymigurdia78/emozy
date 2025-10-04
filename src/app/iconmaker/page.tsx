@@ -91,7 +91,13 @@ const resolveImageSrc = (imagePath: string, updatedAt?: string) => {
   if (imagePath.startsWith("http://") || imagePath.startsWith("https://")) {
     return `${imagePath}${versionSuffix}`;
   }
-  const normalized = imagePath.startsWith("/") ? imagePath.slice(1) : imagePath;
+  const normalized = imagePath
+    .replace(/^rails\/?public\/?/i, "")
+    .replace(/^public\/?/i, "")
+    .replace(/^\/+/, "");
+  if (!normalized) {
+    return "";
+  }
   const base = `${ASSET_BASE_URL}/${normalized}`;
   return `${base}${versionSuffix}`;
 };

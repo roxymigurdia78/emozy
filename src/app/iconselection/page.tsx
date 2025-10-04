@@ -1,7 +1,5 @@
 "use client";
 import Image from "next/image";
-import Link from "next/link";
-import Toukou from "../components/toukou";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useRouter } from "next/navigation";
@@ -29,6 +27,32 @@ type IconPartsResponse = {
   frame_images?: OwnedAsset[];
 };
 
+type IconImage = {
+  id: number;
+  image: string;
+  point: number;
+  created_at: string;
+  updated_at: string;
+  owned?: boolean;
+};
+
+type IconImageIndexResponse = {
+  icon_images: IconImage[];
+};
+
+type IconImageListItem = {
+  id: number;
+  user_id: number;
+  icon_image_id: number;
+  created_at: string;
+  updated_at: string;
+  icon_image: IconImage;
+};
+
+type IconImageListResponse = {
+  icon_image_lists: IconImageListItem[];
+};
+
 type UserProfile = {
   id: number;
   name: string;
@@ -43,6 +67,11 @@ type UserProfile = {
 
 const ICON_PARTS_ENDPOINT = "http://localhost:3333/api/v1/icon_parts";
 const FRAME_ACQUIRE_ENDPOINT = "http://localhost:3333/api/v1/frame_list/acquire";
+const ICON_IMAGES_ENDPOINT = "http://localhost:3333/api/v1/icon_image";
+const ICON_IMAGE_LIST_ENDPOINT = "http://localhost:3333/api/v1/icon_image_list";
+const ICON_IMAGE_ACQUIRE_ENDPOINT = "http://localhost:3333/api/v1/icon_image_list/acquire";
+const ICON_SAVE_ENDPOINT = "http://localhost:3333/api/v1/icon_maker/save";
+const ICON_MAKE_ENDPOINT = "http://localhost:3333/api/v1/icon_maker/make_icon";
 const USER_ENDPOINT = "http://localhost:3333/api/v1/users";
 const ASSET_BASE_URL = "http://localhost:3333";
 
@@ -58,7 +87,13 @@ const resolveImageSrc = (imagePath: string, updatedAt?: string) => {
   if (imagePath.startsWith("http://") || imagePath.startsWith("https://")) {
     return `${imagePath}${versionSuffix}`;
   }
-  const normalized = imagePath.startsWith("/") ? imagePath.slice(1) : imagePath;
+  const normalized = imagePath
+    .replace(/^rails\/?public\/?/i, "")
+    .replace(/^public\/?/i, "")
+    .replace(/^\/+/, "");
+  if (!normalized) {
+    return "";
+  }
   const base = `${ASSET_BASE_URL}/${normalized}`;
   return `${base}${versionSuffix}`;
 };
@@ -92,29 +127,19 @@ export default function page() {
             .replace(/^\//, "");
     }, []);
 
-    // アイコン・イラスト画像データ
-    const iconImages = [
-        "/images/emozy_logo.png",
-        "/images/emozy_rogo.png",
-        "/images/homeicon.png",
-        "/images/iconmaker.png",
-        "/images/kigou.png"
-    ];
-    const illustImages = [
-        "/images/title.png",
-        "/images/heart.png",
-        "/images/kumo.png",
-        "/images/rankingicon.png",
-        "/images/searchicon.png"
-    ];
+    // アイコン一覧と所持状態
+    const [iconOptions, setIconOptions] = useState<IconImage[]>([]);
+    const [iconOwnership, setIconOwnership] = useState<Record<number, boolean>>({});
+    const [selectedIconImageId, setSelectedIconImageId] = useState<number | null>(null);
+    const [isIconLoading, setIsIconLoading] = useState(false);
+    const [iconError, setIconError] = useState<string | null>(null);
+    const [acquiringIconId, setAcquiringIconId] = useState<number | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
+    const [saveError, setSaveError] = useState<string | null>(null);
 
     // 選択状態
-    const [selectedIcon, setSelectedIcon] = useState(iconImages[0]);
-    const [selectedIllust, setSelectedIllust] = useState(illustImages[0]);
     // 表示コンテンツのモード
-    const [selectMode, setSelectMode] = useState<'icon' | 'illust' | 'frame'>('icon');
-    // プレビューのベース画像種別
-    const [basePreviewMode, setBasePreviewMode] = useState<'icon' | 'illust'>('icon');
+    const [selectMode, setSelectMode] = useState<'icon' | 'frame'>('icon');
 
     useEffect(() => {
         if (currentUserId === null) {
@@ -184,6 +209,87 @@ export default function page() {
             return;
         }
         if (!currentUserId) {
+            setIsIconLoading(false);
+            setIconOptions([]);
+            setIconOwnership({});
+            setSelectedIconImageId(null);
+            setIconError("ユーザー情報が見つかりません。ログインしてください。");
+            return;
+        }
+
+        const fetchIconImages = async () => {
+            setIsIconLoading(true);
+            setIconError(null);
+            setAcquiringIconId(null);
+            try {
+                const iconResponse = await fetch(ICON_IMAGES_ENDPOINT, { cache: "no-store" });
+                if (!iconResponse.ok) {
+                    throw new Error(`アイコン画像の取得に失敗しました: ${iconResponse.status}`);
+                }
+
+                const iconData = (await iconResponse.json()) as IconImageIndexResponse;
+
+                const ownedMap: Record<number, boolean> = {};
+                try {
+                    const listResponse = await fetch(
+                        `${ICON_IMAGE_LIST_ENDPOINT}?user_id=${encodeURIComponent(currentUserId)}`,
+                        { cache: "no-store" }
+                    );
+                    if (listResponse.ok) {
+                        const listData = (await listResponse.json()) as IconImageListResponse;
+                        listData.icon_image_lists?.forEach((item) => {
+                            if (typeof item.icon_image_id === "number") {
+                                ownedMap[item.icon_image_id] = true;
+                            } else if (typeof item.icon_image?.id === "number") {
+                                ownedMap[item.icon_image.id] = true;
+                            }
+                        });
+                    } else if (listResponse.status !== 404 && listResponse.status !== 204) {
+                        const body = await listResponse.text();
+                        throw new Error(body || `アイコン所持情報の取得に失敗しました: ${listResponse.status}`);
+                    }
+                } catch (err) {
+                    const message = err instanceof Error ? err.message : String(err);
+                    console.warn(message);
+                }
+
+                const enrichedIcons = (iconData.icon_images ?? []).map((icon) => {
+                    const owned = ownedMap[icon.id] ?? icon.owned ?? false;
+                    return { ...icon, owned };
+                });
+
+                setIconOptions(enrichedIcons);
+                setIconOwnership(ownedMap);
+
+                setSelectedIconImageId((prev) => {
+                    if (prev !== null) {
+                        const existing = enrichedIcons.find((item) => item.id === prev);
+                        if (existing && (existing.owned ?? ownedMap[prev])) {
+                            return prev;
+                        }
+                    }
+                    const firstOwned = enrichedIcons.find((item) => item.owned);
+                    return firstOwned ? firstOwned.id : null;
+                });
+            } catch (err) {
+                const message = err instanceof Error ? err.message : "アイコン画像を取得できませんでした";
+                setIconError(message);
+                setIconOptions([]);
+                setIconOwnership({});
+                setSelectedIconImageId(null);
+            } finally {
+                setIsIconLoading(false);
+            }
+        };
+
+        void fetchIconImages();
+    }, [currentUserId]);
+
+    useEffect(() => {
+        if (currentUserId === null) {
+            return;
+        }
+        if (!currentUserId) {
             setIsUserLoading(false);
             setUserPoint(null);
             setPurchaseError("ユーザー情報が見つかりません。ログインしてください。");
@@ -237,6 +343,33 @@ export default function page() {
         },
         [frameAssets, normalizeImageKey]
     );
+
+    const isIconOwned = useCallback(
+        (option: IconImage) => {
+            if (typeof option.owned === "boolean") {
+                return option.owned;
+            }
+            return iconOwnership[option.id] ?? false;
+        },
+        [iconOwnership]
+    );
+
+    const getIconCost = useCallback((option: IconImage) => {
+        return typeof option.point === "number" ? option.point : null;
+    }, []);
+
+    const sortedIconOptions = useMemo(() => {
+        return iconOptions
+            .map((option, index) => ({ option, index }))
+            .sort((a, b) => {
+                const ownedDiff = (isIconOwned(b.option) ? 1 : 0) - (isIconOwned(a.option) ? 1 : 0);
+                if (ownedDiff !== 0) {
+                    return ownedDiff;
+                }
+                return a.index - b.index;
+            })
+            .map(({ option }) => option);
+    }, [iconOptions, isIconOwned]);
 
     const acquireFrame = useCallback(
         async (option: IconPart) => {
@@ -355,6 +488,104 @@ export default function page() {
         [currentUserId, frameAssets, isUserLoading, normalizeImageKey, userPoint]
     );
 
+    const acquireIconImage = useCallback(
+        async (option: IconImage) => {
+            if (!currentUserId) {
+                setPurchaseError("ユーザー情報が見つかりません。ログインしてください。");
+                return false;
+            }
+
+            const numericUserId = Number(currentUserId);
+            if (!Number.isFinite(numericUserId) || numericUserId <= 0) {
+                setPurchaseError("ユーザー情報が不正です。ログインし直してください。");
+                return false;
+            }
+
+            if (isUserLoading) {
+                setPurchaseError("ユーザー情報を取得しています。少し待ってから再度お試しください。");
+                return false;
+            }
+
+            if (userPoint === null) {
+                setPurchaseError("ユーザーの所持ポイントを取得できませんでした。");
+                return false;
+            }
+
+            const cost = typeof option.point === "number" ? option.point : 0;
+            const remainingPoints = userPoint - cost;
+            if (remainingPoints < 0) {
+                setPurchaseError(`ポイントが不足しています。（所持: ${userPoint} / 必要: ${cost}）`);
+                return false;
+            }
+
+            const confirmMessage = [
+                "アイコンを購入しますか？",
+                "",
+                `所持ポイント: ${formatPoint(userPoint)}`,
+                `消費ポイント: ${formatPoint(cost)}`,
+                `購入後ポイント: ${formatPoint(remainingPoints)}`,
+            ].join("\n");
+
+            const confirmed = window.confirm(confirmMessage);
+            if (!confirmed) {
+                setPurchaseMessage("購入をキャンセルしました。");
+                return false;
+            }
+
+            setAcquiringIconId(option.id);
+            setPurchaseError(null);
+            setPurchaseMessage(null);
+            try {
+                const response = await fetch(ICON_IMAGE_ACQUIRE_ENDPOINT, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        user_id: numericUserId,
+                        icon_image_id: option.id,
+                    }),
+                });
+
+                if (!response.ok) {
+                    let message = `アイコンを取得できませんでした: ${response.status}`;
+                    const rawBody = await response.text();
+                    if (rawBody) {
+                        try {
+                            const errorJson = JSON.parse(rawBody);
+                            if (typeof errorJson?.message === "string") {
+                                message = errorJson.message;
+                            }
+                        } catch {
+                            message = rawBody;
+                        }
+                    }
+                    throw new Error(message);
+                }
+
+                setIconOwnership((prev) => ({
+                    ...prev,
+                    [option.id]: true,
+                }));
+                setIconOptions((prev) =>
+                    prev.map((item) => (item.id === option.id ? { ...item, owned: true } : item))
+                );
+                setUserPoint(remainingPoints);
+                setSelectedIconImageId(option.id);
+                setBasePreviewMode('icon');
+                setPurchaseMessage("アイコンを取得しました。");
+                return true;
+            } catch (err) {
+                const message = err instanceof Error ? err.message : "アイコンの取得に失敗しました。";
+                setPurchaseError(message);
+                return false;
+            } finally {
+                setAcquiringIconId(null);
+            }
+        },
+        [currentUserId, isUserLoading, userPoint]
+    );
+
     const handleFrameClick = useCallback(
         async (option: IconPart) => {
             const owned = isFrameOwned(option);
@@ -369,20 +600,126 @@ export default function page() {
         [acquireFrame, isFrameOwned]
     );
 
+    const handleIconClick = useCallback(
+        async (option: IconImage) => {
+            if (acquiringIconId === option.id) {
+                return;
+            }
+            if (isIconOwned(option)) {
+                setSelectedIconImageId(option.id);
+                setPurchaseMessage(null);
+                setPurchaseError(null);
+                return;
+            }
+            await acquireIconImage(option);
+        },
+        [acquireIconImage, acquiringIconId, isIconOwned]
+    );
+
+    const selectedIconOption = useMemo(() => {
+        if (selectedIconImageId === null) return null;
+        return iconOptions.find((item) => item.id === selectedIconImageId) ?? null;
+    }, [iconOptions, selectedIconImageId]);
+
+    const selectedIconSrc = useMemo(() => {
+        if (!selectedIconOption) return "";
+        return resolveImageSrc(selectedIconOption.image, selectedIconOption.updated_at);
+    }, [selectedIconOption]);
+
+    const numericUserId = useMemo(() => {
+        if (!currentUserId) return null;
+        const parsed = Number(currentUserId);
+        if (!Number.isFinite(parsed) || parsed <= 0) return null;
+        return parsed;
+    }, [currentUserId]);
+
     const selectedFrame = useMemo(() => {
         if (selectedFrameId === null) return null;
         return frameOptions.find((item) => item.id === selectedFrameId) ?? null;
     }, [frameOptions, selectedFrameId]);
+
+    const canUseSelectedFrame = useMemo(() => {
+        if (!selectedFrame) return false;
+        return isFrameOwned(selectedFrame);
+    }, [isFrameOwned, selectedFrame]);
+
+    const selectedFrameAsset = useMemo(() => {
+        if (!selectedFrame || !canUseSelectedFrame) return null;
+        const key = normalizeImageKey(selectedFrame.image);
+        if (!key) return null;
+        return frameAssets.find((asset) => normalizeImageKey(asset.image) === key) ?? null;
+    }, [frameAssets, normalizeImageKey, selectedFrame, canUseSelectedFrame]);
+
+    const selectedFrameAssetId = selectedFrameAsset?.id ?? null;
 
     const selectedFrameSrc = useMemo(() => {
         if (!selectedFrame) return "";
         return resolveImageSrc(selectedFrame.image, selectedFrame.updated_at);
     }, [selectedFrame]);
 
-    const canUseSelectedFrame = useMemo(() => {
-        if (!selectedFrame) return false;
-        return isFrameOwned(selectedFrame);
-    }, [isFrameOwned, selectedFrame]);
+    const sortedFrameOptions = useMemo(() => {
+        return frameOptions
+            .map((option, index) => ({ option, index }))
+            .sort((a, b) => {
+                const ownedDiff = (isFrameOwned(b.option) ? 1 : 0) - (isFrameOwned(a.option) ? 1 : 0);
+                if (ownedDiff !== 0) {
+                    return ownedDiff;
+                }
+                return a.index - b.index;
+            })
+            .map(({ option }) => option);
+    }, [frameOptions, isFrameOwned]);
+
+    const handleComplete = useCallback(async () => {
+        setSaveError(null);
+        if (numericUserId === null) {
+            setSaveError("ユーザー情報が見つかりません。ログインしてください。");
+            return;
+        }
+        if (selectedIconImageId === null) {
+            setSaveError("アイコンを選択してください。");
+            setSelectMode('icon');
+            return;
+        }
+        if (selectedIconOption && !isIconOwned(selectedIconOption)) {
+            setSaveError("未所持のアイコンは使用できません。購入後に選択してください。");
+            setSelectMode('icon');
+            return;
+        }
+
+        const payload: Record<string, unknown> = {
+            user_id: numericUserId,
+            icon_image_id: selectedIconImageId,
+        };
+
+        if (selectedFrameAssetId && canUseSelectedFrame) {
+            payload.frame_image_id = selectedFrameAssetId;
+        }
+
+        setIsSaving(true);
+        try {
+            const payloadJson = JSON.stringify(payload);
+            const requestInit: RequestInit = {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: payloadJson,
+            };
+
+            const saveResponse = await fetch(ICON_SAVE_ENDPOINT, requestInit);
+            if (!saveResponse.ok) {
+                throw new Error(`icon_maker/save API でエラーが発生しました: ${saveResponse.status}`);
+            }
+
+            router.push("/profile");
+        } catch (err) {
+            const message = err instanceof Error ? err.message : "保存処理に失敗しました";
+            setSaveError(message);
+        } finally {
+            setIsSaving(false);
+        }
+    }, [numericUserId, selectedIconImageId, selectedIconOption, isIconOwned, canUseSelectedFrame, selectedFrameAssetId, router]);
 
     return (
         <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #f7faff 0%, #e3e6f5 100%)", position: "relative" }}>
@@ -426,13 +763,32 @@ export default function page() {
                             overflow: "hidden"
                         }}
                     >
-                        <Image
-                            src={basePreviewMode === 'icon' ? selectedIcon : selectedIllust}
-                            alt="preview"
-                            fill
-                            sizes="180px"
-                            style={{ objectFit: "cover" }}
-                        />
+                        {selectedIconSrc ? (
+                            <Image
+                                src={selectedIconSrc}
+                                alt="selected icon"
+                                fill
+                                sizes="180px"
+                                style={{ objectFit: "contain" }}
+                            />
+                        ) : (
+                            <div
+                                style={{
+                                    position: "absolute",
+                                    inset: 0,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    padding: "16px",
+                                    textAlign: "center",
+                                    color: "#94a3b8",
+                                    fontSize: "13px",
+                                    lineHeight: 1.5,
+                                }}
+                            >
+                                アイコンを選択または購入してください
+                            </div>
+                        )}
                         {selectedFrame && canUseSelectedFrame && selectedFrameSrc && (
                             <Image
                                 src={selectedFrameSrc}
@@ -461,7 +817,6 @@ export default function page() {
                                 type="button"
                                 onClick={() => {
                                     setSelectMode('icon');
-                                    setBasePreviewMode('icon');
                                 }}
                                 style={{
                                     padding: "12px 32px",
@@ -477,27 +832,6 @@ export default function page() {
                                 }}
                             >
                                 アイコン
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setSelectMode('illust');
-                                    setBasePreviewMode('illust');
-                                }}
-                                style={{
-                                    padding: "12px 32px",
-                                    fontSize: "17px",
-                                    fontWeight: "bold",
-                                    borderRadius: "18px",
-                                    border: selectMode === 'illust' ? "2px solid #50c9c3" : "2px solid #e2e8f0",
-                                    background: selectMode === 'illust' ? "linear-gradient(90deg, #dbfbff 0%, #c8eff6 100%)" : "#f8fafc",
-                                    color: selectMode === 'illust' ? "#115e59" : "#475569",
-                                    cursor: "pointer",
-                                    boxShadow: selectMode === 'illust' ? "0 4px 14px rgba(16,185,129,0.3)" : "0 2px 6px rgba(148,163,184,0.25)",
-                                    transition: "all 0.2s",
-                                }}
-                            >
-                                イラスト
                             </button>
                             <button
                                 type="button"
@@ -520,70 +854,115 @@ export default function page() {
                         </div>
 
                         {selectMode === 'icon' && (
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "24px" }}>
-                                {iconImages.map((img) => (
-                                    <div key={img} style={{ display: "flex", justifyContent: "center" }}>
-                                        <button
-                                            type="button"
-                                            onClick={() => setSelectedIcon(img)}
-                                            style={{
-                                                width: 78,
-                                                height: 78,
-                                                borderRadius: "50%",
-                                                border: selectedIcon === img ? "3px solid #4a90e2" : "2px solid #e2e8f0",
-                                                background: selectedIcon === img ? "linear-gradient(120deg, #e0e7ff 60%, #f7faff 100%)" : "#f8fafc",
-                                                display: "flex",
-                                                alignItems: "center",
-                                                justifyContent: "center",
-                                                cursor: "pointer",
-                                                transition: "all 0.2s",
-                                                boxShadow: selectedIcon === img ? "0 4px 16px rgba(74,144,226,0.35)" : "0 2px 8px rgba(148,163,184,0.15)",
-                                            }}
-                                        >
-                                            <Image
-                                                src={img}
-                                                alt="icon"
-                                                width={54}
-                                                height={54}
-                                                style={{ borderRadius: "50%", filter: selectedIcon === img ? "none" : "grayscale(30%) brightness(1.1)", transition: "all 0.2s" }}
-                                            />
-                                        </button>
+                            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                                {isIconLoading && (
+                                    <p style={{ fontSize: "14px", color: "#475569" }}>アイコンを読み込み中です...</p>
+                                )}
+                                {!isIconLoading && iconError && (
+                                    <p style={{ fontSize: "14px", color: "#dc2626" }}>{iconError}</p>
+                                )}
+                                {!isIconLoading && !iconError && iconOptions.length === 0 && (
+                                    <p style={{ fontSize: "14px", color: "#475569" }}>表示できるアイコンがありません。</p>
+                                )}
+                                {!isIconLoading && !iconError && iconOptions.length > 0 && (
+                                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(96px, 1fr))", gap: "20px" }}>
+                                        {sortedIconOptions.map((option) => {
+                                            const owned = isIconOwned(option);
+                                            const optionSrc = resolveImageSrc(option.image, option.updated_at);
+                                            const isSelected = selectedIconImageId === option.id;
+                                            const isAcquiring = acquiringIconId === option.id;
+                                            const cost = getIconCost(option);
+                                            const cursorStyle = isAcquiring ? "wait" : "pointer";
+                                            const borderColor = isSelected ? "#4a90e2" : owned ? "#94a3b8" : "#cbd5f5";
+                                            const borderWidth = isSelected ? "3px" : "2px";
+                                            const boxShadow = isSelected ? "0 6px 18px rgba(74,144,226,0.35)" : "0 3px 12px rgba(15,23,42,0.12)";
+                                            return (
+                                                <button
+                                                    type="button"
+                                                    key={option.id}
+                                                    onClick={() => {
+                                                        if (isAcquiring) return;
+                                                        void handleIconClick(option);
+                                                    }}
+                                                    style={{
+                                                        position: "relative",
+                                                        width: "100%",
+                                                        paddingTop: "100%",
+                                                        borderRadius: "24px",
+                                                        border: `${borderWidth} solid ${borderColor}`,
+                                                        background: "#ffffff",
+                                                        boxShadow,
+                                                        cursor: cursorStyle,
+                                                        overflow: "hidden",
+                                                        transition: "all 0.2s",
+                                                        outline: "none",
+                                                    }}
+                                                >
+                                                    <span
+                                                        style={{
+                                                            position: "absolute",
+                                                            inset: 0,
+                                                            display: "flex",
+                                                            alignItems: "center",
+                                                            justifyContent: "center",
+                                                            padding: "12px",
+                                                        }}
+                                                    >
+                                                        {optionSrc && (
+                                                            <Image
+                                                                src={optionSrc}
+                                                                alt="icon-option"
+                                                                fill
+                                                                sizes="96px"
+                                                                style={{ objectFit: "contain" }}
+                                                            />
+                                                        )}
+                                                        {!owned && (
+                                                            <span
+                                                                style={{
+                                                                    position: "absolute",
+                                                                    inset: 0,
+                                                                    display: "flex",
+                                                                    alignItems: "center",
+                                                                    justifyContent: "center",
+                                                                    background: "rgba(15,23,42,0.55)",
+                                                                    color: "#f8fafc",
+                                                                    fontSize: "12px",
+                                                                    fontWeight: 700,
+                                                                    letterSpacing: "0.05em",
+                                                                }}
+                                                            >
+                                                                {isAcquiring ? "購入中..." : "未所持"}
+                                                            </span>
+                                                        )}
+                                                    </span>
+                                                    {cost !== null && (
+                                                        <span
+                                                            style={{
+                                                                position: "absolute",
+                                                                left: "10px",
+                                                                right: "10px",
+                                                                bottom: "10px",
+                                                                display: "inline-flex",
+                                                                justifyContent: "center",
+                                                                alignItems: "center",
+                                                                padding: "4px 6px",
+                                                                borderRadius: "999px",
+                                                                fontSize: "11px",
+                                                                fontWeight: 700,
+                                                                background: owned ? "rgba(255,255,255,0.85)" : "rgba(186,230,253,0.4)",
+                                                                color: owned ? "#1f2937" : "#0369a1",
+                                                                backdropFilter: "blur(2px)",
+                                                            }}
+                                                        >
+                                                            {owned ? `所有 ${formatPoint(cost)}` : `購入 ${formatPoint(cost)}`}
+                                                        </span>
+                                                    )}
+                                                </button>
+                                            );
+                                        })}
                                     </div>
-                                ))}
-                            </div>
-                        )}
-
-                        {selectMode === 'illust' && (
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "24px" }}>
-                                {illustImages.map((img) => (
-                                    <div key={img} style={{ display: "flex", justifyContent: "center" }}>
-                                        <button
-                                            type="button"
-                                            onClick={() => setSelectedIllust(img)}
-                                            style={{
-                                                width: 78,
-                                                height: 78,
-                                                borderRadius: "50%",
-                                                border: selectedIllust === img ? "3px solid #50c9c3" : "2px solid #e2e8f0",
-                                                background: selectedIllust === img ? "linear-gradient(120deg, #d1fae5 60%, #ecfeff 100%)" : "#f8fafc",
-                                                display: "flex",
-                                                alignItems: "center",
-                                                justifyContent: "center",
-                                                cursor: "pointer",
-                                                transition: "all 0.2s",
-                                                boxShadow: selectedIllust === img ? "0 4px 16px rgba(16,185,129,0.3)" : "0 2px 8px rgba(148,163,184,0.15)",
-                                            }}
-                                        >
-                                            <Image
-                                                src={img}
-                                                alt="illust"
-                                                width={54}
-                                                height={54}
-                                                style={{ borderRadius: "50%", filter: selectedIllust === img ? "none" : "grayscale(30%) brightness(1.1)", transition: "all 0.2s" }}
-                                            />
-                                        </button>
-                                    </div>
-                                ))}
+                                )}
                             </div>
                         )}
 
@@ -606,7 +985,7 @@ export default function page() {
                                 )}
                                 {!isFrameLoading && !frameError && frameOptions.length > 0 && (
                                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: "18px" }}>
-                                        {frameOptions.map((option) => {
+                                        {sortedFrameOptions.map((option) => {
                                             const owned = isFrameOwned(option);
                                             const optionSrc = resolveImageSrc(option.image, option.updated_at);
                                             const isSelected = selectedFrameId === option.id;
@@ -718,11 +1097,17 @@ export default function page() {
                         )}
                     </div>
                 </div>
+                {saveError && (
+                    <p style={{ marginTop: "16px", textAlign: "center", fontSize: "14px", fontWeight: 600, color: "#b91c1c" }}>
+                        {saveError}
+                    </p>
+                )}
             </div>
             {/* きせかえ完了ボタン */}
             <div style={{ position: "fixed", left: 0, bottom: 0, width: "100%", display: "flex", justifyContent: "center", padding: "24px 0", zIndex: 100 }}>
                 <button
                     type="button"
+                    disabled={isSaving}
                     style={{
                         minWidth: "220px",
                         padding: "18px 0",
@@ -730,16 +1115,19 @@ export default function page() {
                         fontWeight: "bold",
                         borderRadius: "32px",
                         border: "none",
-                        background: "linear-gradient(90deg, #4a90e2 0%, #50c9c3 100%)",
+                        background: isSaving ? "#94a3b8" : "linear-gradient(90deg, #4a90e2 0%, #50c9c3 100%)",
                         color: "#fff",
-                        boxShadow: "0 4px 24px #b3d8ff",
-                        cursor: "pointer",
+                        boxShadow: isSaving ? "none" : "0 4px 24px #b3d8ff",
+                        cursor: isSaving ? "not-allowed" : "pointer",
                         letterSpacing: "2px",
-                        transition: "all 0.2s"
+                        transition: "all 0.2s",
+                        opacity: isSaving ? 0.7 : 1,
                     }}
-                    onClick={() => router.push("/profile")}
+                    onClick={() => {
+                        void handleComplete();
+                    }}
                 >
-                    きせかえ完了
+                    {isSaving ? "保存中..." : "きせかえ完了"}
                 </button>
             </div>
         </div>
