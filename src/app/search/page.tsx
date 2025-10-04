@@ -15,6 +15,7 @@ type Post = {
   reaction_ids: number[];
   reaction_counts: number[];
   reacted_reaction_ids: number[];
+  is_favorited: boolean;
 };
 
 const emotionMap: Record<string, [string, number]> = {
@@ -70,6 +71,7 @@ export default function SearchPage() {
       reaction_ids,
       reaction_counts,
       reacted_reaction_ids: p.reacted_reaction_ids || [],
+      is_favorited: !!p.is_favorited,
     };
   };
 
