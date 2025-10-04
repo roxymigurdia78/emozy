@@ -64,13 +64,26 @@ export default function FavoritePage() { // コンポーネント名を変更
 
     return (
         <div style={{ minHeight: "100vh", background: "#f8fafc" }}>
-            <header style={{ /* ... */ }}>
-                {/* ... (ヘッダー部分は変更なし) ... */}
+            <header style={{
+                backgroundColor:"#7ADAD5",
+                height:"100px",
+                display:"flex",
+                alignItems: "center"      
+            }}>
+                <Link href="/home" >
+                    <Image 
+                        src="/images/title.png"
+                        alt="title"
+                        width={150}
+                        height={150}
+                        style={{marginLeft: "5%"}}
+                    />
+                </Link>    
             </header>
 
-            <main style={{ padding: "32px", maxWidth: "700px", margin: "0 auto", paddingBottom: "75px" }}>
+            <main style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: "0", paddingBottom: "90px" }}>
                 {posts.length > 0 ? (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "16px", background: "#fff", borderRadius: "24px", padding: "16px", boxShadow: "0 8px 32px rgba(0,0,0,0.08)" }}>
+                    <div style={{ width: '100%' }}>
                         {posts.map((post) => (
                             <Toukou key={post.id} post={post} />
                         ))}
@@ -81,6 +94,67 @@ export default function FavoritePage() { // コンポーネント名を変更
                     </p>
                 )}
             </main>
+
+            <footer style={{
+                backgroundColor: "#f3f2f2ac",
+                height: "75px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                position: "fixed",
+                bottom: "0",
+                width: "100%",
+                padding: "0 32px"
+            }}>
+                <Link href="/home" style={{ display: "flex", alignItems: "flex-end", height: "100px", flexShrink: 0, flexGrow: 0 }}>
+                    <Image
+                        src="/images/homeicon.png"
+                        alt="homeicon"
+                        width={60}
+                        height={60}
+                        style={{ marginLeft: "-30px", marginTop: "10px", marginBottom: "15px", marginRight: "3px", minWidth: "65px", minHeight: "65px" }}
+                    />
+                </Link>
+                <Link href="/ranking" style={{ display: "flex", alignItems: "flex-end", height: "100px", flexShrink: 0, flexGrow: 0 }}>
+                    <Image
+                        src="/images/rankingicon.png"
+                        alt="rankingicon"
+                        width={60}
+                        height={60}
+                        style={{ marginLeft: "0px", marginTop: "10px", marginBottom: "15px", marginRight: "0px", minWidth: "65px", minHeight: "65px" }}
+                    />
+                </Link>
+                <Link
+                    href={currentUserId ? `/post?userId=${encodeURIComponent(currentUserId)}` : "/post"}
+                    style={{ display: "flex", alignItems: "flex-end", height: "100px", flexShrink: 0, flexGrow: 0 }}
+                >
+                    <Image
+                        src="/images/toukouicon.png"
+                        alt="posticon"
+                        width={60}
+                        height={60}
+                        style={{ marginLeft: "0px", marginTop: "10px", marginBottom: "19px", marginRight: "0px", minWidth: "65px", minHeight: "65px" }}
+                    />
+                </Link>
+                <Link href="/search" style={{ display: "flex", alignItems: "flex-end", height: "100px", flexShrink: 0, flexGrow: 0 }}>
+                    <Image
+                        src="/images/searchicon.png"
+                        alt="searchicon"
+                        width={60}
+                        height={60}
+                        style={{ marginLeft: "0px", marginTop: "10px", marginBottom: "22px", marginRight: "-5px", minWidth: "65px", minHeight: "65px" }}
+                    />
+                </Link>
+                <Link href="/profile" style={{ display: "flex", alignItems: "flex-end", height: "100px", flexShrink: 0, flexGrow: 0 }}>
+                    <Image
+                        src="/images/toukouicon.png"
+                        alt="profileicon"
+                        width={60}
+                        height={60}
+                        style={{ marginLeft: "-8px", marginTop: "10px", marginBottom: "19px", marginRight: "-24px", minWidth: "65px", minHeight: "65px" }}
+                    />
+                </Link>
+            </footer>
         </div>
     );
 }

@@ -81,9 +81,9 @@ export default function Home() {
         </Link>    
     </header>
 
-    <main style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: "0" }}>
+    <main style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: "0", paddingBottom: "90px" }}>
         {posts.length === 0 ? (
-            <div style={{ color: "#888", marginTop: "32px" }}>現在は投稿が無く、さみしい感じですね、、、、。</div>
+            <div style={{ color: "#888", marginTop: "32px" }}>ロード中...</div>
         ) : (
             posts.map((post) => (
                 <Toukou key={post.id} post={post} />

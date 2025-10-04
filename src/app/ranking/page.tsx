@@ -209,7 +209,7 @@ export default function Page() {
                 </div>
             </header>
 
-            <main style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: "0" }}>
+            <main style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: "0", paddingBottom: "90px" }}>
                 {posts.length === 0 ? (
                     <div style={{ color: "#888", marginTop: "32px" }}>絵文字を選択してください。</div>
                 ) : (
