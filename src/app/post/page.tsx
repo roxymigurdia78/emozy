@@ -294,6 +294,7 @@ export default function PostPage() {
             onClick={() => {
               setPostType("photo");
               setText("");
+              setShouldUseAiCheck(false);
             }}
           >
             写真
@@ -323,10 +324,12 @@ export default function PostPage() {
               />
             </label>
             {preview ? (
-              <img
+              <Image
                 src={preview}
                 alt="preview"
-                className="mt-3 w-full rounded-lg shadow-md"
+                width={400}
+                height={300}
+                className="mt-3 w-full rounded-lg shadow-md object-cover"
               />
             ) : (
               <p className="text-center text-sm text-gray-500 mt-2">
