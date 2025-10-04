@@ -48,7 +48,6 @@ const BACKGROUND_ACQUIRE_ENDPOINT = "http://localhost:3333/api/v1/background_lis
 const FRAME_ACQUIRE_ENDPOINT = "http://localhost:3333/api/v1/frame_list/acquire";
 const USER_ENDPOINT = "http://localhost:3333/api/v1/users";
 const ASSET_BASE_URL = "http://localhost:3333";
-const DEFAULT_USER_ID = 1; // 仮のユーザーID（APIリクエストで使用）
 
 // パーツの優先順位
 const PART_ORDER = [
@@ -99,6 +98,7 @@ const resolveImageSrc = (imagePath: string, updatedAt?: string) => {
 
 export default function Page() {
   const router = useRouter();
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   // APIから取得したパーツをカテゴリ毎に保持
   const [parts, setParts] = useState<Record<string, IconPart[]>>({});
   // 現在選択中のカテゴリ
@@ -136,6 +136,11 @@ export default function Page() {
   const [userPoint, setUserPoint] = useState<number | null>(null);
   const [isUserLoading, setIsUserLoading] = useState(false);
 
+  useEffect(() => {
+    const storedId = window.localStorage.getItem("emozyUserId");
+    setCurrentUserId(storedId ?? "");
+  }, []);
+
   const normalizeImageKey = useCallback((imagePath: string) => {
     if (!imagePath) return "";
     return imagePath
@@ -145,6 +150,20 @@ export default function Page() {
   }, []);
 
   useEffect(() => {
+    if (currentUserId === null) {
+      return;
+    }
+    if (!currentUserId) {
+      setParts({});
+      setSelectedPartIds({});
+      setOwnershipMap({});
+      setBackgroundAssets([]);
+      setFrameAssets([]);
+      setIsLoading(false);
+      setError("ユーザー情報が見つかりません。ログインしてください。");
+      return;
+    }
+
     const fetchIconParts = async () => {
       setIsLoading(true);
       setError(null);
@@ -153,7 +172,7 @@ export default function Page() {
       setAcquiringTarget(null);
       try {
         // 取得時にキャッシュを無効化し、追加された最新パーツが即時反映されるようにする
-        const response = await fetch(`${ICON_PARTS_ENDPOINT}?user_id=${DEFAULT_USER_ID}`, {
+        const response = await fetch(`${ICON_PARTS_ENDPOINT}?user_id=${encodeURIComponent(currentUserId)}`, {
           cache: "no-store",
         });
         if (!response.ok) {
@@ -197,8 +216,9 @@ export default function Page() {
           setSelectedPartIds({});
           const keys = Object.keys(data.icon_parts);
           if (keys.length > 0) {
-            // 最初のカテゴリを選択状態にする
-            setActivePart(keys[0]);
+            // 背景パーツがあれば優先的に選択する
+            const preferredPart = keys.includes("background") ? "background" : keys[0];
+            setActivePart(preferredPart);
           }
         }
       } catch (err) {
@@ -210,13 +230,24 @@ export default function Page() {
     };
 
     void fetchIconParts();
-  }, [normalizeImageKey]);
+  }, [currentUserId, normalizeImageKey]);
 
   useEffect(() => {
+    if (currentUserId === null) {
+      return;
+    }
+    if (!currentUserId) {
+      setIsUserLoading(false);
+      setUserPoint(null);
+      setPurchaseError("ユーザー情報が見つかりません。ログインしてください。");
+      return;
+    }
+
     const fetchUserProfile = async () => {
       setIsUserLoading(true);
+      setPurchaseError(null);
       try {
-        const response = await fetch(`${USER_ENDPOINT}/${DEFAULT_USER_ID}`, {
+        const response = await fetch(`${USER_ENDPOINT}/${encodeURIComponent(currentUserId)}`, {
           cache: "no-store",
         });
         if (!response.ok) {
@@ -233,7 +264,7 @@ export default function Page() {
     };
 
     void fetchUserProfile();
-  }, []);
+  }, [currentUserId]);
 
   const partKeys = useMemo(() => {
     const keys = Object.keys(parts);
@@ -253,7 +284,8 @@ export default function Page() {
 
   useEffect(() => {
     if (!activePart && partKeys.length > 0) {
-      setActivePart(partKeys[0]);
+      const preferredPart = partKeys.includes("skin") ? "skin" : partKeys[0];
+      setActivePart(preferredPart);
     }
   }, [activePart, partKeys]);
 
@@ -351,6 +383,17 @@ export default function Page() {
         return false;
       }
 
+      if (!currentUserId) {
+        setPurchaseError("ユーザー情報が見つかりません。ログインしてください。");
+        return false;
+      }
+
+      const numericUserId = Number(currentUserId);
+      if (!Number.isFinite(numericUserId) || numericUserId <= 0) {
+        setPurchaseError("ユーザー情報が不正です。ログインし直してください。");
+        return false;
+      }
+
       const normalizedKey = normalizeImageKey(option.image);
       if (!normalizedKey) {
         setPurchaseError("購入対象の画像パスが不正です。");
@@ -412,7 +455,7 @@ export default function Page() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            user_id: DEFAULT_USER_ID,
+            user_id: numericUserId,
             [payloadKey]: targetAsset.id,
           }),
         });
@@ -478,7 +521,7 @@ export default function Page() {
         setAcquiringTarget(null);
       }
     },
-    [backgroundAssets, frameAssets, isUserLoading, normalizeImageKey, userPoint]
+    [backgroundAssets, currentUserId, frameAssets, isUserLoading, normalizeImageKey, userPoint]
   );
 
   const handleOptionClick = useCallback(
@@ -499,17 +542,26 @@ export default function Page() {
     [acquirePart, acquiringTarget, handleSelect, isPartOwned]
   );
 
-  const selectionPayload = useMemo(() => {
-    // 選択済みIDのみを抽出してpayloadを構築する
-    const filteredIconParts = Object.fromEntries(
+  const filteredIconParts = useMemo(() => {
+    return Object.fromEntries(
       Object.entries(selectedPartIds).filter(([, value]) => typeof value === "number" && value > 0)
-    );
+    ) as Record<string, number>;
+  }, [selectedPartIds]);
+
+  const selectionPayload = useMemo(() => {
+    if (!currentUserId) {
+      return null;
+    }
+    const numericUserId = Number(currentUserId);
+    if (!Number.isFinite(numericUserId) || numericUserId <= 0) {
+      return null;
+    }
 
     return {
-      user_id: DEFAULT_USER_ID,
+      user_id: numericUserId,
       icon_parts: filteredIconParts,
     };
-  }, [selectedPartIds]);
+  }, [currentUserId, filteredIconParts]);
 
   const hasSelection = useMemo(
     () => PART_ORDER.some((part) => Boolean(selectedPartIds[part])),
@@ -558,20 +610,25 @@ export default function Page() {
 
   const handleComplete = useCallback(async () => {
     setSaveError(null);
-    const iconPartCount = Object.keys(selectionPayload.icon_parts).length;
+    const iconPartCount = Object.keys(filteredIconParts).length;
     if (iconPartCount === 0) {
       setSaveError("パーツを選択してください。");
       return;
     }
 
     // 未選択のカテゴリがあればユーザーに選択を促す
-    const missingPart = PART_ORDER.find((part) => !Object.prototype.hasOwnProperty.call(selectionPayload.icon_parts, part));
+    const missingPart = PART_ORDER.find((part) => !Object.prototype.hasOwnProperty.call(filteredIconParts, part));
     if (missingPart) {
       const label = PART_LABELS[missingPart] ?? missingPart;
       setSaveError(`${label}を選択してください。`);
       setActivePart(missingPart);
       // 該当タブへスクロール＆フォーカスして入力を促す
       focusPartTab(missingPart);
+      return;
+    }
+
+    if (!selectionPayload) {
+      setSaveError("ユーザー情報が見つかりません。ログインしてください。");
       return;
     }
 
@@ -607,7 +664,7 @@ export default function Page() {
     } finally {
       setIsSaving(false);
     }
-  }, [focusPartTab, router, selectionPayload]);
+  }, [filteredIconParts, focusPartTab, router, selectionPayload]);
 
   const activeOptions = activePart ? parts[activePart] ?? [] : [];
   const activeSelectionId = activePart ? selectedPartIds[activePart] : undefined;
@@ -769,7 +826,7 @@ export default function Page() {
                         acquiringTarget?.part === (activePart ?? "") && acquiringTarget?.optionId === option.id;
                       const optionCost = getOptionCost(activePart ?? "", option);
                       const optionClasses = [
-                        "relative flex items-center justify-center rounded-2xl border-2 bg-white transition-all duration-150 h-20 w-20 sm:h-24 sm:w-24",
+                        "relative flex items-center justify-center rounded-2xl border-2 bg-gray-400 transition-all duration-150 h-20 w-20 sm:h-24 sm:w-24 overflow-hidden",
                         isSelected
                           ? "border-[#7ADAD5] shadow-lg shadow-[#7ADAD5]/20"
                           : "border-gray-200 hover:border-[#7ADAD5]/60 hover:-translate-y-1",
@@ -790,10 +847,10 @@ export default function Page() {
                             alt={PART_LABELS[activePart ?? ""] ?? ""}
                             fill
                             sizes="96px"
-                            className={`object-contain p-2 ${!isOwned ? "grayscale" : ""}`}
+                            className="object-contain p-2"
                           />
                           {!isOwned && (
-                            <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/40 text-xs font-semibold text-white">
+                            <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-xs font-semibold text-white drop-shadow-md">
                               {isAcquiring ? "購入中..." : "未所持"}
                             </div>
                           )}
