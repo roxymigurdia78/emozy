@@ -53,19 +53,17 @@ export default function SearchPage() {
     (word) => word.startsWith(emotionQuery) && emotionQuery !== ""
   );
 
-  /**
-   * APIから受け取った投稿データをPost型に変換する共通関数
-   */
+  // APIから受け取った投稿データをPost型に変換する共通関数
   const formatPost = (p: any, userName?: string): Post => {
     const reaction_ids = p.num_reactions
       ? Object.keys(p.num_reactions).map(id => Number(id))
       : [];
     const reaction_counts = p.num_reactions
-      ? Object.values(p.num_reactions)
+      ? Object.values(p.num_reactions) as number[]
       : [];
     return {
       id: p.id,
-      user: userName || p.name, // 引数でuserNameが渡されればそれを使う
+      user: userName || p.name,
       userIconUrl: "/images/mitei.png",
       content: p.content,
       imageUrl: p.image_url,
@@ -75,9 +73,7 @@ export default function SearchPage() {
     };
   };
 
-  /**
-   * 検索APIを呼び出す共通関数
-   */
+  // 検索APIを呼び出す共通関数
   const executeSearch = async () => {
     if (!currentUserId) {
       alert("ユーザー情報が取得できません。");
@@ -99,9 +95,7 @@ export default function SearchPage() {
     return res.json();
   };
 
-  /**
-   * 検索ボタンが押された時の処理
-   */
+  // 検索ボタンが押された時の処理
   const handleSearch = async () => {
     try {
       const data = await executeSearch();
@@ -120,13 +114,11 @@ export default function SearchPage() {
       setHasMore(uniquePosts.length > 10);
       setPage(1); // 新しい検索なのでページ番号を1にリセット
     } catch (e) {
-      console.error("❌ 検索失敗:", e);
+      console.error("検索失敗:", e);
     }
   };
 
-  /**
-   * 「もっと見る」が押された時の処理
-   */
+  // 「もっと見る」が押された時の処理
   const handleLoadMore = async () => {
     try {
       const pageSize = 10;
@@ -149,14 +141,12 @@ export default function SearchPage() {
       setPage(nextPage);
       setHasMore(nextResults.length < uniquePosts.length);
     } catch (e) {
-      console.error("❌ もっと読む処理に失敗:", e);
+      console.error("もっと読む処理に失敗:", e);
     }
   };
 
-  // return (...) 以降のJSX部分は変更ありません
   return (
     <div style={{ background: "#f7f9fa", minHeight: "100vh" }}>
-      {/* (header, main, footer のJSXは変更なし) */}
       <header
         style={{
           backgroundColor: "#7ADAD5",
@@ -194,7 +184,7 @@ export default function SearchPage() {
             type="text"
             value={nameOrId}
             onChange={(e) => setNameOrId(e.target.value)}
-            placeholder="名前またはIDで検索"
+            placeholder="名前または投稿内容で検索"
             style={{
               border: "1px solid #ccc",
               padding: "12px",
