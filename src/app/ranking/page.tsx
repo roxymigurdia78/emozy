@@ -45,6 +45,7 @@ export default function Page() {
                 reaction_counts,
                 reacted_reaction_ids: item.reacted_reaction_ids || [],
                 num_reactions: item.num_reactions || {},
+                is_favorited: !!item.is_favorited,
             };
             });
             setPosts(posts);
@@ -102,6 +103,7 @@ export default function Page() {
                 reaction_counts,
                 reacted_reaction_ids: item.reacted_reaction_ids || [],
                 num_reactions: item.num_reactions || {},
+                is_favorited: !!item.is_favorited,
                 };
             })
             : [];
