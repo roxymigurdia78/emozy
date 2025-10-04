@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import Toukou from "../components/toukou";
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 type User = {
     id: number;
@@ -18,20 +19,135 @@ type User = {
     icon_image_url?: string;
 };
 
+type FrameImageResponse = {
+    image_url?: string;
+};
+
 export default function page() {
+    const searchParams = useSearchParams();
+    const [userId, setUserId] = useState<string>(() => searchParams.get("userId") ?? "");
     const [user, setUser] = useState<User | null>(null);
     const [post, setPost] = useState(null);
+    const [frameImageUrl, setFrameImageUrl] = useState<string | null>(null);
+
     useEffect(() => {
-        fetch("http://localhost:3333/api/v1/users/1")
-            .then((res) => res.json())
-            .then((data) => setUser(data));
-        fetch("http://localhost:3333/api/v1/posts/1")
-            .then((res) => res.json())
-            .then((data) => {
+        const idFromQuery = searchParams.get("userId");
+        if (idFromQuery) {
+            setUserId((current) => (current === idFromQuery ? current : idFromQuery));
+        }
+    }, [searchParams]);
+
+    useEffect(() => {
+        if (typeof window === "undefined") {
+            return;
+        }
+        if (userId) {
+            return;
+        }
+        const storedId = window.localStorage.getItem("emozyUserId");
+        if (storedId) {
+            setUserId(storedId);
+        }
+    }, [userId]);
+
+    useEffect(() => {
+        if (typeof window === "undefined") {
+            return;
+        }
+        if (userId) {
+            try {
+                window.localStorage.setItem("emozyUserId", userId);
+            } catch (error) {
+                console.warn("ユーザーIDの保存に失敗しました", error);
+            }
+        }
+    }, [userId]);
+
+    useEffect(() => {
+        if (!userId) {
+            setUser(null);
+            setFrameImageUrl(null);
+            return;
+        }
+        const numericUserId = Number(userId);
+        if (!Number.isFinite(numericUserId) || numericUserId <= 0) {
+            setUser(null);
+            setFrameImageUrl(null);
+            return;
+        }
+
+        const controller = new AbortController();
+        const loadUser = async () => {
+            try {
+                const res = await fetch(`http://localhost:3333/api/v1/users/${encodeURIComponent(userId)}`, {
+                    cache: "no-store",
+                    signal: controller.signal,
+                });
+                if (!res.ok) {
+                    throw new Error(`Failed to fetch user: ${res.status}`);
+                }
+                const data = (await res.json()) as User;
+                setUser(data);
+                if (data.frame_id) {
+                    try {
+                        const frameRes = await fetch(`http://localhost:3333/api/v1/frame_image/${encodeURIComponent(String(data.frame_id))}/image_url`, {
+                            cache: "no-store",
+                        });
+                        if (frameRes.ok) {
+                            const frameData = (await frameRes.json()) as FrameImageResponse;
+                            setFrameImageUrl(typeof frameData.image_url === "string" ? frameData.image_url : null);
+                        } else {
+                            setFrameImageUrl(null);
+                        }
+                    } catch (error) {
+                        console.warn("フレーム画像の取得に失敗しました", error);
+                        setFrameImageUrl(null);
+                    }
+                } else {
+                    setFrameImageUrl(null);
+                }
+            } catch (error) {
+                if (controller.signal.aborted) {
+                    return;
+                }
+                console.error("ユーザー情報の取得に失敗しました", error);
+                setUser(null);
+                setFrameImageUrl(null);
+            }
+        };
+
+        void loadUser();
+        return () => {
+            controller.abort();
+        };
+    }, [userId]);
+
+    useEffect(() => {
+        if (!userId) {
+            setPost(null);
+            return;
+        }
+        const numericUserId = Number(userId);
+        if (!Number.isFinite(numericUserId) || numericUserId <= 0) {
+            setPost(null);
+            return;
+        }
+
+        const controller = new AbortController();
+        const loadPost = async () => {
+            try {
+                const res = await fetch(`http://localhost:3333/api/v1/posts/${encodeURIComponent(userId)}`, {
+                    cache: "no-store",
+                    signal: controller.signal,
+                });
+                if (!res.ok) {
+                    throw new Error(`Failed to fetch post: ${res.status}`);
+                }
+                const data = await res.json();
                 let reaction_ids: number[] = [];
                 let reaction_counts: number[] = [];
                 if (data.num_reactions) {
-                    reaction_ids = Object.keys(data.num_reactions).map(id => Number(id));
+                    reaction_ids = Object.keys(data.num_reactions).map((id) => Number(id));
                     reaction_counts = Object.values(data.num_reactions);
                 }
                 setPost({
@@ -39,8 +155,20 @@ export default function page() {
                     reaction_ids,
                     reaction_counts,
                 });
-            });
-    }, []);
+            } catch (error) {
+                if (controller.signal.aborted) {
+                    return;
+                }
+                console.error("投稿データの取得に失敗しました", error);
+                setPost(null);
+            }
+        };
+
+        void loadPost();
+        return () => {
+            controller.abort();
+        };
+    }, [userId]);
 
     return (
         <div>
@@ -57,13 +185,26 @@ export default function page() {
                 </Link>
             </div>
             <div style={{ display: "flex", alignItems: "center", paddingLeft: "24px", marginBottom: "35px", marginTop: "26px" }}>
-                <Image
-                    src={user && user.icon_image_url ? user.icon_image_url : "/images/syoki2.png"}
-                    alt="profile icon"
-                    width={128}
-                    height={128}
-                    style={{ borderRadius: "50%", border: "3px solid #eee" }}
-                />
+                <div style={{ position: "relative", width: 128, height: 128 }}>
+                    <Image
+                        src={user && user.icon_image_url ? user.icon_image_url : "/images/syoki2.png"}
+                        alt="profile icon"
+                        fill
+                        sizes="128px"
+                        style={{ borderRadius: "50%", border: "3px solid #eee", objectFit: "cover" }}
+                        priority
+                    />
+                    {frameImageUrl && (
+                        <Image
+                            src={frameImageUrl}
+                            alt="profile frame"
+                            fill
+                            sizes="128px"
+                            style={{ objectFit: "contain", pointerEvents: "none" }}
+                            priority
+                        />
+                    )}
+                </div>
                 <div style={{ marginLeft: "32px", display: "flex", flexDirection: "column", gap: "10px" }}>
                     <span style={{ fontWeight: "bold", fontSize: "20px", color: "#222" }}>
                         {user ? user.name : "..."}
