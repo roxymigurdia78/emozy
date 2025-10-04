@@ -29,7 +29,7 @@ const emotionMap: Record<string, [string, number]> = {
   "ふざけたい": ["😜", 9],
   "おこる": ["😡", 10],
   "たのしい": ["😆", 11],
-  "かわいい": ["😘", 1],
+  "かわいい": ["😘", 12],
 };
 
 const suggestions = Object.keys(emotionMap);
