@@ -71,7 +71,7 @@ const ICON_IMAGES_ENDPOINT = "http://localhost:3333/api/v1/icon_image";
 const ICON_IMAGE_LIST_ENDPOINT = "http://localhost:3333/api/v1/icon_image_list";
 const ICON_IMAGE_ACQUIRE_ENDPOINT = "http://localhost:3333/api/v1/icon_image_list/acquire";
 const ICON_SAVE_ENDPOINT = "http://localhost:3333/api/v1/icon_maker/save";
-const ICON_MAKE_ENDPOINT = "http://localhost:3333/api/v1/icon_maker/make_icon";
+const USER_FRAME_UPDATE_ENDPOINT = "http://localhost:3333/api/v1/make";
 const USER_ENDPOINT = "http://localhost:3333/api/v1/users";
 const ASSET_BASE_URL = "http://localhost:3333";
 
@@ -712,6 +712,24 @@ export default function page() {
             const saveResponse = await fetch(ICON_SAVE_ENDPOINT, requestInit);
             if (!saveResponse.ok) {
                 throw new Error(`icon_maker/save API でエラーが発生しました: ${saveResponse.status}`);
+            }
+
+            if (selectedFrameAssetId && canUseSelectedFrame) {
+                try {
+                    const frameResponse = await fetch(`${USER_FRAME_UPDATE_ENDPOINT}/${numericUserId}`, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({ frame_id: selectedFrameAssetId }),
+                    });
+                    if (!frameResponse.ok) {
+                        const body = await frameResponse.text();
+                        console.warn(`Failed to update frame_id: ${frameResponse.status} ${body}`);
+                    }
+                } catch (err) {
+                    console.warn("ユーザーの frame_id 更新に失敗しました", err);
+                }
             }
 
             router.push("/profile");
