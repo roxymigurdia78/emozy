@@ -45,7 +45,6 @@ const ICON_PARTS_ENDPOINT = "http://localhost:3333/api/v1/icon_parts";
 const ICON_SAVE_ENDPOINT = "http://localhost:3333/api/v1/icon_maker/save";
 const ICON_MAKE_ENDPOINT = "http://localhost:3333/api/v1/icon_maker/make_icon";
 const BACKGROUND_ACQUIRE_ENDPOINT = "http://localhost:3333/api/v1/background_list/acquire";
-const FRAME_ACQUIRE_ENDPOINT = "http://localhost:3333/api/v1/frame_list/acquire";
 const USER_ENDPOINT = "http://localhost:3333/api/v1/users";
 const ASSET_BASE_URL = "http://localhost:3333";
 
@@ -61,7 +60,6 @@ const PART_ORDER = [
   "front_hair",
   "mouth",
   "accessory",
-  "frame",
 ];
 
 const PART_LABELS: Record<string, string> = {
@@ -75,7 +73,6 @@ const PART_LABELS: Record<string, string> = {
   clothing: "洋服",
   accessory: "装飾",
   background: "背景",
-  frame: "フレーム",
 };
 
 const formatPoint = (point?: number | null) => {
@@ -133,6 +130,10 @@ export default function Page() {
   const [backgroundAssets, setBackgroundAssets] = useState<OwnedAsset[]>([]);
   // フレームアイテムの詳細リスト
   const [frameAssets, setFrameAssets] = useState<OwnedAsset[]>([]);
+  const [frameParts, setFrameParts] = useState<IconPart[]>([]);
+  // ユーザーが保持しているフレーム
+  const [userFrameId, setUserFrameId] = useState<number | null>(null);
+  const [userFrameImageSrc, setUserFrameImageSrc] = useState<string | null>(null);
   // パーツ取得中のターゲット（二重押下防止）
   const [acquiringTarget, setAcquiringTarget] = useState<{ part: string; optionId: number } | null>(null);
   // 取得処理に関するステータスメッセージ
@@ -156,6 +157,24 @@ export default function Page() {
   }, []);
 
   useEffect(() => {
+    if (!userFrameId) {
+      setUserFrameImageSrc(null);
+      return;
+    }
+    const matchedAsset = frameAssets.find((asset) => asset.id === userFrameId);
+    if (matchedAsset) {
+      setUserFrameImageSrc(resolveImageSrc(matchedAsset.image, matchedAsset.updated_at));
+      return;
+    }
+    const matchedPart = frameParts.find((part) => part.id === userFrameId);
+    if (matchedPart) {
+      setUserFrameImageSrc(resolveImageSrc(matchedPart.image, matchedPart.updated_at));
+      return;
+    }
+    setUserFrameImageSrc(null);
+  }, [frameAssets, frameParts, userFrameId]);
+
+  useEffect(() => {
     if (currentUserId === null) {
       return;
     }
@@ -165,6 +184,9 @@ export default function Page() {
       setOwnershipMap({});
       setBackgroundAssets([]);
       setFrameAssets([]);
+      setFrameParts([]);
+      setUserFrameId(null);
+      setUserFrameImageSrc(null);
       setIsLoading(false);
       setError("ユーザー情報が見つかりません。ログインしてください。");
       return;
@@ -201,6 +223,7 @@ export default function Page() {
           };
           setBackgroundAssets(data.background_images ?? []);
           setFrameAssets(data.frame_images ?? []);
+          setFrameParts(data.icon_parts.frame ?? []);
           applyOwnership(data.background_images, "background");
           applyOwnership(data.frame_images, "frame");
           if (data.icon_parts.background) {
@@ -209,12 +232,7 @@ export default function Page() {
               owned: ownedEntries.background?.[normalizeImageKey(item.image)] ?? item.owned,
             }));
           }
-          if (data.icon_parts.frame) {
-            data.icon_parts.frame = data.icon_parts.frame.map((item) => ({
-              ...item,
-              owned: ownedEntries.frame?.[normalizeImageKey(item.image)] ?? item.owned,
-            }));
-          }
+          delete data.icon_parts.frame;
           setOwnershipMap(ownedEntries);
           // APIレスポンスのパーツ一覧を保持（所持情報を付与した後のデータ）
           setParts(data.icon_parts);
@@ -261,9 +279,12 @@ export default function Page() {
         }
         const data = (await response.json()) as UserProfile;
         setUserPoint(typeof data.point === "number" ? data.point : 0);
+        setUserFrameId(typeof data.frame_id === "number" ? data.frame_id : null);
       } catch (err) {
         const message = err instanceof Error ? err.message : "ユーザー情報を取得できませんでした。";
         setPurchaseError(message);
+        setUserFrameId(null);
+        setUserFrameImageSrc(null);
       } finally {
         setIsUserLoading(false);
       }
@@ -384,7 +405,7 @@ export default function Page() {
       if (!part) return false;
       setPurchaseError(null);
       setPurchaseMessage(null);
-      if (part !== "background" && part !== "frame") {
+      if (part !== "background") {
         setPurchaseError("このパーツは購入に対応していません。");
         return false;
       }
@@ -406,9 +427,9 @@ export default function Page() {
         return false;
       }
 
-      const assetList = part === "background" ? backgroundAssets : frameAssets;
-      const endpoint = part === "background" ? BACKGROUND_ACQUIRE_ENDPOINT : FRAME_ACQUIRE_ENDPOINT;
-      const payloadKey = part === "background" ? "background_image_id" : "frame_image_id";
+      const assetList = backgroundAssets;
+      const endpoint = BACKGROUND_ACQUIRE_ENDPOINT;
+      const payloadKey = "background_image_id";
 
       const targetAsset = assetList.find(
         (asset) => normalizeImageKey(asset.image) === normalizedKey
@@ -527,7 +548,7 @@ export default function Page() {
         setAcquiringTarget(null);
       }
     },
-    [backgroundAssets, currentUserId, frameAssets, isUserLoading, normalizeImageKey, userPoint]
+    [backgroundAssets, currentUserId, isUserLoading, normalizeImageKey, userPoint]
   );
 
   const handleOptionClick = useCallback(
@@ -582,9 +603,8 @@ export default function Page() {
   const activeAssetList = useMemo(() => {
     if (!activePart) return [] as OwnedAsset[];
     if (activePart === "background") return backgroundAssets;
-    if (activePart === "frame") return frameAssets;
     return [] as OwnedAsset[];
-  }, [activePart, backgroundAssets, frameAssets]);
+  }, [activePart, backgroundAssets]);
 
   const getOptionCost = useCallback(
     (part: string, option: IconPart) => {
@@ -594,15 +614,9 @@ export default function Page() {
         );
         return asset?.point ?? null;
       }
-      if (part === "frame") {
-        const asset = frameAssets.find(
-          (item) => normalizeImageKey(item.image) === normalizeImageKey(option.image)
-        );
-        return asset?.point ?? null;
-      }
       return null;
     },
-    [backgroundAssets, frameAssets, normalizeImageKey]
+    [backgroundAssets, normalizeImageKey]
   );
 
   const activeSelectionCost = useMemo(() => {
@@ -728,6 +742,15 @@ export default function Page() {
                     <div className="absolute inset-0 flex items-center justify-center px-6 text-center text-sm text-gray-400">
                       パーツを選択するとプレビューが表示されます
                     </div>
+                  )}
+                  {userFrameImageSrc && (
+                    <Image
+                      src={userFrameImageSrc}
+                      alt="frame"
+                      fill
+                      sizes="176px"
+                      className="object-contain pointer-events-none"
+                    />
                   )}
                 </div>
               </div>

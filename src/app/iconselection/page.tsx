@@ -68,7 +68,6 @@ type UserProfile = {
 const ICON_PARTS_ENDPOINT = "http://localhost:3333/api/v1/icon_parts";
 const FRAME_ACQUIRE_ENDPOINT = "http://localhost:3333/api/v1/frame_list/acquire";
 const ICON_IMAGES_ENDPOINT = "http://localhost:3333/api/v1/icon_image";
-const ICON_IMAGE_LIST_ENDPOINT = "http://localhost:3333/api/v1/icon_image_list";
 const ICON_IMAGE_ACQUIRE_ENDPOINT = "http://localhost:3333/api/v1/icon_image_list/acquire";
 const ICON_SAVE_ENDPOINT = "http://localhost:3333/api/v1/icon_maker/save";
 const USER_FRAME_UPDATE_ENDPOINT = "http://localhost:3333/api/v1/make";
@@ -227,7 +226,7 @@ export default function page() {
                     throw new Error(`アイコン画像の取得に失敗しました: ${iconResponse.status}`);
                 }
 
-                const iconData = (await iconResponse.json()) as newIconImageResponse;
+                const iconData = (await iconResponse.json()) as IconImageApiResponse;
 
                 const ownedMap: Record<number, boolean> = {};
 
