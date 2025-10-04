@@ -11,13 +11,13 @@ export default function Page() {
     const [showPopup, setShowPopup] = useState(false);
     const [posts, setPosts] = useState<any[]>([]);
 
-    // ✅ ユーザーIDを localStorage から取得
+    // ユーザーIDを localStorage から取得
     useEffect(() => {
         const storedId = window.localStorage.getItem("emozyUserId") || "";
         setCurrentUserId(storedId);
     }, []);
 
-    // ✅ currentUserId を使ってランキング取得（IDが取れてから）
+    // currentUserId を使ってランキング取得（IDが取れてから）
     useEffect(() => {
         if (!currentUserId) return;
 
@@ -124,7 +124,7 @@ export default function Page() {
             const data = await res.json();
             console.log("リアクション送信成功:", data);
 
-            // ✅ 再取得して最新状態を反映
+            // 再取得して最新状態を反映
             const refresh = await fetch(`http://localhost:3333/api/v1/ranking?user_id=${currentUserId}`);
             const refreshedJson = await refresh.json();
             const list = Array.isArray(refreshedJson) ? refreshedJson : refreshedJson.ranking || [];

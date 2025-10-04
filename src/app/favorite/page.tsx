@@ -22,7 +22,9 @@ export default function FavoritePage() { // コンポーネント名を変更
 
         const fetchFavorites = async () => {
             try {
-                const res = await fetch(`http://localhost:3333/api/v1/favorites/${currentUserId}`);
+                const res = await fetch(`http://localhost:3333/api/v1/favorites/${currentUserId}`, {
+                    cache: "no-store",
+                });
                 if (!res.ok) {
                     throw new Error("お気に入り投稿の取得に失敗しました");
                 }
