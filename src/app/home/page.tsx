@@ -19,8 +19,16 @@ type ApiPost = {
     reacted_reaction_ids?: number[];
     is_favorited?: boolean;
 };
-export default function Home() {
 
+const shuffleArray = (array: any[]) => {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
+};
+
+export default function Home() {
     const [posts, setPosts] = useState<Post[]>([]);
     const [currentUserId, setCurrentUserId] = useState("");
     useEffect(() => {
@@ -37,7 +45,7 @@ export default function Home() {
             .then(res => res.json())
             .then(data => {
             console.log("APIレスポンス:", data);
-            const posts = (data as ApiPost[]).map((item) => {
+            const posts = (data as ApiPost[]).map((item): Post => {
                 const reaction_ids = item.num_reactions
                 ? Object.keys(item.num_reactions).map(id => Number(id))
                 : [1, 2, 3];
@@ -56,7 +64,7 @@ export default function Home() {
                 is_favorited: !!item.is_favorited,
                 };
             });
-            setPosts(posts);
+            setPosts(shuffleArray(posts));
             })
             .catch(err => console.error("投稿取得エラー", err));
         }, []);
