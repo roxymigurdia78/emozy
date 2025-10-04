@@ -27,6 +27,17 @@ type IconPartsResponse = {
   frame_images?: OwnedAsset[];
 };
 
+type ApiIconImage = {
+  id: number;
+  image: string;
+  point: number;
+  created_at: string;
+  updated_at: string;
+  image_url?: string;
+  icon_image_list_id?: number;
+  owned?: boolean;
+};
+
 type IconImage = {
   id: number;
   image: string;
@@ -36,21 +47,10 @@ type IconImage = {
   owned?: boolean;
 };
 
-type IconImageIndexResponse = {
-  icon_images: IconImage[];
-};
-
-type IconImageListItem = {
-  id: number;
-  user_id: number;
-  icon_image_id: number;
-  created_at: string;
-  updated_at: string;
-  icon_image: IconImage;
-};
-
-type IconImageListResponse = {
-  icon_image_lists: IconImageListItem[];
+type IconImageApiResponse = {
+  owned_icon_images?: ApiIconImage[];
+  unowned_icon_images?: ApiIconImage[];
+  generated_icon_images?: ApiIconImage[];
 };
 
 type UserProfile = {
@@ -222,53 +222,54 @@ export default function page() {
             setIconError(null);
             setAcquiringIconId(null);
             try {
-                const iconResponse = await fetch(ICON_IMAGES_ENDPOINT, { cache: "no-store" });
+                const iconResponse = await fetch(`${ICON_IMAGES_ENDPOINT}?user_id=${encodeURIComponent(currentUserId)}`, { cache: "no-store" });
                 if (!iconResponse.ok) {
                     throw new Error(`アイコン画像の取得に失敗しました: ${iconResponse.status}`);
                 }
 
-                const iconData = (await iconResponse.json()) as IconImageIndexResponse;
+                const iconData = (await iconResponse.json()) as newIconImageResponse;
 
                 const ownedMap: Record<number, boolean> = {};
-                try {
-                    const listResponse = await fetch(
-                        `${ICON_IMAGE_LIST_ENDPOINT}?user_id=${encodeURIComponent(currentUserId)}`,
-                        { cache: "no-store" }
-                    );
-                    if (listResponse.ok) {
-                        const listData = (await listResponse.json()) as IconImageListResponse;
-                        listData.icon_image_lists?.forEach((item) => {
-                            if (typeof item.icon_image_id === "number") {
-                                ownedMap[item.icon_image_id] = true;
-                            } else if (typeof item.icon_image?.id === "number") {
-                                ownedMap[item.icon_image.id] = true;
-                            }
-                        });
-                    } else if (listResponse.status !== 404 && listResponse.status !== 204) {
-                        const body = await listResponse.text();
-                        throw new Error(body || `アイコン所持情報の取得に失敗しました: ${listResponse.status}`);
-                    }
-                } catch (err) {
-                    const message = err instanceof Error ? err.message : String(err);
-                    console.warn(message);
-                }
 
-                const enrichedIcons = (iconData.icon_images ?? []).map((icon) => {
-                    const owned = ownedMap[icon.id] ?? icon.owned ?? false;
-                    return { ...icon, owned };
+                const ownedIcons = iconData.owned_icon_images ?? [];
+                const unownedIcons = iconData.unowned_icon_images ?? [];
+                const generatedIcons = iconData.generated_icon_images ?? [];
+
+                const allIcons = [...ownedIcons, ...unownedIcons, ...generatedIcons];
+
+                allIcons.forEach((icon) => {
+                    if (typeof icon.icon_image_list_id === "number") {
+                        ownedMap[icon.id] = true;
+                    }
                 });
 
-                setIconOptions(enrichedIcons);
+                const normalizedIcons: IconImage[] = allIcons.map((icon) => ({
+                    id: icon.id,
+                    image: icon.image,
+                    point: icon.point,
+                    created_at: icon.created_at,
+                    updated_at: icon.updated_at,
+                    owned: ownedMap[icon.id] ?? false,
+                }));
+
+                const filteredIcons = normalizedIcons.filter((icon) => {
+                    if (typeof icon.point === "number" && icon.point === 0) {
+                        return icon.owned === true;
+                    }
+                    return true;
+                });
+
+                setIconOptions(filteredIcons);
                 setIconOwnership(ownedMap);
 
                 setSelectedIconImageId((prev) => {
                     if (prev !== null) {
-                        const existing = enrichedIcons.find((item) => item.id === prev);
+                        const existing = filteredIcons.find((item) => item.id === prev);
                         if (existing && (existing.owned ?? ownedMap[prev])) {
                             return prev;
                         }
                     }
-                    const firstOwned = enrichedIcons.find((item) => item.owned);
+                    const firstOwned = filteredIcons.find((item) => item.owned);
                     return firstOwned ? firstOwned.id : null;
                 });
             } catch (err) {
@@ -411,6 +412,7 @@ export default function page() {
             const cost = targetAsset.point ?? 0;
             const remainingPoints = userPoint - cost;
             if (remainingPoints < 0) {
+                setPurchaseMessage(null);
                 setPurchaseError(`ポイントが不足しています。（所持: ${userPoint} / 必要: ${cost}）`);
                 return false;
             }
@@ -514,6 +516,7 @@ export default function page() {
             const cost = typeof option.point === "number" ? option.point : 0;
             const remainingPoints = userPoint - cost;
             if (remainingPoints < 0) {
+                setPurchaseMessage(null);
                 setPurchaseError(`ポイントが不足しています。（所持: ${userPoint} / 必要: ${cost}）`);
                 return false;
             }
@@ -572,7 +575,6 @@ export default function page() {
                 );
                 setUserPoint(remainingPoints);
                 setSelectedIconImageId(option.id);
-                setBasePreviewMode('icon');
                 setPurchaseMessage("アイコンを取得しました。");
                 return true;
             } catch (err) {
@@ -855,6 +857,12 @@ export default function page() {
 
                         {selectMode === 'icon' && (
                             <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                    <h3 style={{ fontSize: "18px", fontWeight: 700, color: "#1f3247" }}>アイコン一覧</h3>
+                                    <span style={{ fontSize: "14px", fontWeight: 600, color: "#475569" }}>
+                                        {isUserLoading ? "ポイント読み込み中..." : `所持ポイント: ${formatPoint(userPoint)}`}
+                                    </span>
+                                </div>
                                 {isIconLoading && (
                                     <p style={{ fontSize: "14px", color: "#475569" }}>アイコンを読み込み中です...</p>
                                 )}
@@ -930,6 +938,8 @@ export default function page() {
                                                                     fontSize: "12px",
                                                                     fontWeight: 700,
                                                                     letterSpacing: "0.05em",
+                                                                    textAlign: "center",
+                                                                    pointerEvents: "none",
                                                                 }}
                                                             >
                                                                 {isAcquiring ? "購入中..." : "未所持"}
