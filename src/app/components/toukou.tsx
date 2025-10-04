@@ -95,7 +95,7 @@ export default function Toukou({ post }: { post: Post }) {
     }}>
       <div style={{ display: "flex", alignItems: "center", marginBottom: "8px", position: "relative" }}>
         <Image
-          src={post.userIconUrl}
+          src={post.userIconUrl || "/images/title.png"}
           alt="user icon"
           width={40}
           height={40}
