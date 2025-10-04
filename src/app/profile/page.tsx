@@ -185,18 +185,38 @@ export default function page() {
 
     return (
         <div>
-            <div style={{ width: "100%", padding: "24px 0 8px 24px", fontWeight: "bold", fontSize: "30px", color: "#222", position: "relative" }}>
-                {/* {user ? user.name : "..."} */}
-                <Link href="/setting">
-                    <img
-                        src="/images/settei.png"
-                        alt="settings"
-                        width={36}
-                        height={36}
-                        style={{ position: "absolute", top: 30, right: 24, cursor: "pointer" }}
+            <header style={{
+                backgroundColor: "#7ADAD5",
+                height: "100px",
+                display: "flex",
+                alignItems: "center",
+                padding: "0 5%",
+            }}>
+                <Link href="/home">
+                    <Image
+                        src="/images/emozy_logo.png"
+                        alt="emozy logo"
+                        width={150}
+                        height={150}
+                        style={{ cursor: "pointer" }}
+                        priority
                     />
                 </Link>
-            </div>
+                <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "16px" }}>
+                    <span style={{ fontWeight: "bold", fontSize: "24px", color: "#fff" }}>
+                        {/* {user ? user.name : "..."} */}
+                    </span>
+                    <Link href="/setting">
+                        <img
+                            src="/images/settei.png"
+                            alt="settings"
+                            width={36}
+                            height={36}
+                            style={{ cursor: "pointer" }}
+                        />
+                    </Link>
+                </div>
+            </header>
             <div style={{ display: "flex", alignItems: "center", paddingLeft: "24px", marginBottom: "35px", marginTop: "26px" }}>
                 <div style={{ position: "relative", width: 128, height: 128 }}>
                     <Image
