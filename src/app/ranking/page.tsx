@@ -23,7 +23,7 @@ export default function Page() {
 
         const fetchRanking = async () => {
         try {
-            const res = await fetch(`http://localhost:3333/api/v1/ranking?user_id=${currentUserId}`);
+            const res = await fetch(`http://localhost:3333/api/v1/ranking?user_id=${currentUserId}`, { cache: "no-store" });
             const json = await res.json();
             console.log("GETランキングレスポンス:", json);
 
@@ -213,8 +213,23 @@ export default function Page() {
                 {posts.length === 0 ? (
                     <div style={{ color: "#888", marginTop: "32px" }}>絵文字を選択してください。</div>
                 ) : (
-                    posts.map((post: Post, index: number) => (
-                        <Toukou key={`${post.id}-${index}`} post={post} />
+                    posts.map((post, index) => (
+                        // ★★★ Toukouをdivで囲み、順位の数字を表示 ★★★
+                        <div key={post.id} style={{ display: 'flex', alignItems: 'center', width: '100%', borderBottom: '1px solid #e2e8f0' }}>
+                            <div style={{
+                                flexShrink: 0,
+                                width: '50px',
+                                textAlign: 'center',
+                                fontSize: '1.2rem',
+                                fontWeight: 'bold',
+                                color: '#718096',
+                            }}>
+                                {index + 1}
+                            </div>
+                            <div style={{ flexGrow: 1 }}>
+                                <Toukou post={post} />
+                            </div>
+                        </div>
                     ))
                 )}
             </main>
