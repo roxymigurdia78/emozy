@@ -158,7 +158,7 @@ export default function Page() {
                     <div style={{ minWidth: "150px", maxWidth: "150px", display: "flex", alignItems: "center" }}>
                         <Link href="/home" >
                             <Image 
-                                src="/images/title.png"
+                                src="/images/emozy_logo.png"
                                 alt="title"
                                 width={150}
                                 height={150}
