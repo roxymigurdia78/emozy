@@ -2,6 +2,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import Toukou from "../components/toukou";
+import type { Post as ToukouPost } from "../components/toukou";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
@@ -27,8 +28,8 @@ export default function page() {
     const searchParams = useSearchParams();
     const [userId, setUserId] = useState<string>(() => searchParams.get("userId") ?? "");
     const [user, setUser] = useState<User | null>(null);
-    const [post, setPost] = useState(null);
     const [frameImageUrl, setFrameImageUrl] = useState<string | null>(null);
+    const [posts, setPosts] = useState<ToukouPost[]>([]);
 
     useEffect(() => {
         const idFromQuery = searchParams.get("userId");
@@ -124,51 +125,67 @@ export default function page() {
 
     useEffect(() => {
         if (!userId) {
-            setPost(null);
+            setPosts([]);
             return;
         }
         const numericUserId = Number(userId);
         if (!Number.isFinite(numericUserId) || numericUserId <= 0) {
-            setPost(null);
+            setPosts([]);
             return;
         }
 
         const controller = new AbortController();
-        const loadPost = async () => {
+        const loadPosts = async () => {
             try {
-                const res = await fetch(`http://localhost:3333/api/v1/posts/${encodeURIComponent(userId)}`, {
+                const res = await fetch(`http://localhost:3333/api/v1/posts/user/${encodeURIComponent(userId)}`, {
                     cache: "no-store",
                     signal: controller.signal,
                 });
                 if (!res.ok) {
-                    throw new Error(`Failed to fetch post: ${res.status}`);
+                    throw new Error(`Failed to fetch user posts: ${res.status}`);
                 }
                 const data = await res.json();
-                let reaction_ids: number[] = [];
-                let reaction_counts: number[] = [];
-                if (data.num_reactions) {
-                    reaction_ids = Object.keys(data.num_reactions).map((id) => Number(id));
-                    reaction_counts = Object.values(data.num_reactions);
-                }
-                setPost({
-                    ...data,
-                    reaction_ids,
-                    reaction_counts,
+                const parsed = Array.isArray(data)
+                    ? data
+                    : Array.isArray(data?.posts)
+                        ? data.posts
+                        : [];
+
+                const normalized: ToukouPost[] = parsed.map((item: any) => {
+                    const num_reactions = item?.num_reactions ?? {};
+                    const reaction_ids = Object.keys(num_reactions).map((id) => Number(id));
+                    const reaction_counts = Object.values(num_reactions);
+                    const iconUrl = item?.icon_image_url && item.icon_image_url !== ""
+                        ? item.icon_image_url
+                        : user?.icon_image_url && user.icon_image_url !== ""
+                            ? user.icon_image_url
+                            : "/images/syoki2.png";
+                    return {
+                        id: item.id,
+                        user: item?.name ?? user?.name ?? "",
+                        userIconUrl: iconUrl,
+                        content: item?.content ?? "",
+                        imageUrl: item?.image_url ?? undefined,
+                        reaction_ids,
+                        reaction_counts,
+                    };
                 });
+
+                setPosts(normalized);
             } catch (error) {
                 if (controller.signal.aborted) {
                     return;
                 }
                 console.error("投稿データの取得に失敗しました", error);
-                setPost(null);
+                setPosts([]);
             }
         };
 
-        void loadPost();
+        void loadPosts();
         return () => {
             controller.abort();
         };
-    }, [userId]);
+    }, [userId, user?.icon_image_url, user?.name]);
 
     return (
         <div>
@@ -216,8 +233,12 @@ export default function page() {
                 {user ? user.profile : "..."}
             </div>
 
-            <main style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: "0" }}>
-                {post && <Toukou post={post} />}
+            <main style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: "0", gap: "24px" }}>
+                {posts.length > 0 ? (
+                    posts.map((post) => <Toukou key={post.id} post={post} />)
+                ) : (
+                    <p style={{ color: "#666", fontSize: "15px" }}>まだ投稿がありません。</p>
+                )}
             </main>
 
             <footer style={{
