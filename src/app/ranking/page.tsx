@@ -73,7 +73,7 @@ export default function Page() {
             return;
         }
         const body = {
-            ranking: { reaction_id: emotionId, limit: 50 },
+            ranking: { reaction_id: emotionId, limit: 10 },
             user_id: currentUserId,
         };
         console.log("送信JSON:", body);
