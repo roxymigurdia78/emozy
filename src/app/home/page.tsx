@@ -18,6 +18,7 @@ type ApiPost = {
     num_reactions?: { [id: string]: number };
     reacted_reaction_ids?: number[];
     is_favorited?: boolean;
+    icon_image_url?: string;
 };
 export default function Home() {
 
@@ -44,10 +45,11 @@ export default function Home() {
                 const reaction_counts = item.num_reactions
                 ? Object.values(item.num_reactions)
                 : [0, 0, 0];
+                const iconUrl = item.icon_image_url || "/images/syoki2.png";
                 return {
                 id: item.id,
                 user: item.name,
-                userIconUrl: "/images/title.png",
+                userIconUrl: iconUrl,
                 content: item.content,
                 imageUrl: item.image_url,
                 reaction_ids,

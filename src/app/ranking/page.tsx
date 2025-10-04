@@ -38,7 +38,7 @@ export default function Page() {
             return {
                 id: item.id,
                 user: item.name || `user${item.user_id}`,
-                userIconUrl: "/images/title.png",
+                userIconUrl: item?.icon_image_url ?? "/images/syoki2.png",
                 content: item.content,
                 imageUrl: item.image_url,
                 reaction_ids,
@@ -96,7 +96,7 @@ export default function Page() {
                 return {
                 id: item.id,
                 user: item.name || `user${item.user_id}`,
-                userIconUrl: "/images/title.png",
+                userIconUrl: item?.icon_image_url ?? "/images/syoki2.png",
                 content: item.content,
                 imageUrl: item.image_url,
                 reaction_ids,
@@ -133,7 +133,7 @@ export default function Page() {
             setPosts(list.map((item: any) => ({
             id: item.id,
             user: item.name || `user${item.user_id}`,
-            userIconUrl: "/images/title.png",
+            userIconUrl: item?.icon_image_url ?? "/images/syoki2.png",
             content: item.content,
             imageUrl: item.image_url,
             reaction_ids: item.num_reactions ? Object.keys(item.num_reactions).map(Number) : [1,2,3],

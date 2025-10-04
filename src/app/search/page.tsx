@@ -65,7 +65,7 @@ export default function SearchPage() {
     return {
       id: p.id,
       user: userName || p.name,
-      userIconUrl: "/images/mitei.png",
+      userIconUrl: p.icon_image_url || "/images/syoki2.png",
       content: p.content,
       imageUrl: p.image_url,
       reaction_ids,
