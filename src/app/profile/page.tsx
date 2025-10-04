@@ -155,11 +155,7 @@ export default function page() {
                     const num_reactions = item?.num_reactions ?? {};
                     const reaction_ids = Object.keys(num_reactions).map((id) => Number(id));
                     const reaction_counts = Object.values(num_reactions);
-                    const iconUrl = item?.icon_image_url && item.icon_image_url !== ""
-                        ? item.icon_image_url
-                        : user?.icon_image_url && user.icon_image_url !== ""
-                            ? user.icon_image_url
-                            : "/images/syoki2.png";
+                    const iconUrl = item?.icon_image_url ?? user?.icon_image_url ?? "/images/syoki2.png";
                     return {
                         id: item.id,
                         user: item?.name ?? user?.name ?? "",
