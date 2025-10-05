@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { ChangeEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import styles from "./PostPage.module.css";
 import Link from "next/link";
@@ -11,7 +12,8 @@ export default function PostPage() {
   const searchParams = useSearchParams();
 
   const [userId, setUserId] = useState(() => searchParams.get("userId") ?? "");
-  const [postType, setPostType] = useState<"text" | "photo" | null>(null);
+  const [postType, setPostType] = useState<"text" | "photo" | "both" | null>(null);
+  const [topicId, setTopicId] = useState(() => searchParams.get("topicId") ?? "1");
   const [text, setText] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -24,8 +26,12 @@ export default function PostPage() {
 
   useEffect(() => {
     const idFromQuery = searchParams.get("userId");
+    const topicIdFromQuery = searchParams.get("topicId");
     if (idFromQuery) {
       setUserId((current) => (current === idFromQuery ? current : idFromQuery));
+    }
+    if (topicIdFromQuery) {
+      setTopicId((current) => (current === topicIdFromQuery ? current : topicIdFromQuery));
     }
   }, [searchParams]);
 
@@ -55,6 +61,14 @@ export default function PostPage() {
     }
   }, [userId]);
 
+  useEffect(() => {
+    return () => {
+      if (preview && preview.startsWith("blob:")) {
+        URL.revokeObjectURL(preview);
+      }
+    };
+  }, [preview]);
+
   // 感情の候補（ID順）
   const emotions = [
     "😎", // 1
@@ -72,11 +86,30 @@ export default function PostPage() {
   ];
 
   // 画像選択
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setPhoto(e.target.files[0]);
-      setPreview(URL.createObjectURL(e.target.files[0]));
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      return;
     }
+
+    if (!file.type.startsWith("image/")) {
+      alert("画像ファイルを選択してください");
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      alert("10MB以下の画像を選択してください");
+      return;
+    }
+
+    setPhoto(file);
+    const objectUrl = URL.createObjectURL(file);
+    setPreview((prev) => {
+      if (prev && prev.startsWith("blob:")) {
+        URL.revokeObjectURL(prev);
+      }
+      return objectUrl;
+    });
   };
 
   // 感情の選択・解除
@@ -91,7 +124,7 @@ export default function PostPage() {
   // 投稿処理
   const handleSubmit = () => {
     if (!postType) {
-      alert("テキスト投稿か写真投稿のどちらかを選択してください");
+      alert("投稿タイプを選択してください");
       return;
     }
     if (postType === "text" && !text.trim()) {
@@ -101,6 +134,16 @@ export default function PostPage() {
     if (postType === "photo" && !photo) {
       alert("写真を選択してください");
       return;
+    }
+    if (postType === "both") {
+      if (!text.trim()) {
+        alert("テキストを入力してください");
+        return;
+      }
+      if (!photo) {
+        alert("写真を選択してください");
+        return;
+      }
     }
     if (selectedEmotions.length === 0) {
       alert("感情を1つ以上3つ以下で選んでください");
@@ -121,18 +164,50 @@ export default function PostPage() {
     }
 
     // 画像をbase64化する関数
-    const toBase64 = (file: File): Promise<string> => {
+    type ImagePayload = {
+      base64: string;
+      mimeType: string;
+      fileName: string;
+    };
+
+    const toBase64 = (file: File): Promise<ImagePayload> => {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => {
-          resolve(reader.result as string);
+          const result = reader.result as string | ArrayBuffer | null;
+          if (typeof result !== "string") {
+            reject(new Error("画像データの変換に失敗しました"));
+            return;
+          }
+
+          const commaIndex = result.indexOf(",");
+          if (commaIndex === -1) {
+            reject(new Error("画像のbase64形式が不正です"));
+            return;
+          }
+
+          const base64 = result.slice(commaIndex + 1);
+          if (!base64) {
+            reject(new Error("画像データが空です"));
+            return;
+          }
+
+          resolve({
+            base64,
+            mimeType: file.type || "application/octet-stream",
+            fileName: file.name || "upload",
+          });
         };
-        reader.onerror = reject;
+    reader.onerror = () => reject(new Error("画像の読み込みに失敗しました"));
         reader.readAsDataURL(file);
       });
     };
 
     const postData = async () => {
+      const sanitizedContent = text.trim();
+      const numericTopicId = Number(topicId);
+      const fallbackTopicId = Number.isNaN(numericTopicId) ? 1 : numericTopicId;
+
       type PostBody = {
         post: {
           user_id: number;
@@ -143,9 +218,9 @@ export default function PostPage() {
         };
       };
 
-      let imageBase64 = "";
-      if (postType === "photo" && photo) {
-        imageBase64 = await toBase64(photo);
+      let imagePayload: ImagePayload | null = null;
+      if ((postType === "photo" || postType === "both") && photo) {
+        imagePayload = await toBase64(photo);
       }
 
       // selectedEmotionsからreaction_idsを生成
@@ -153,25 +228,34 @@ export default function PostPage() {
       const body: PostBody = {
         post: {
           user_id: numericUserId,
-          topic_id: 1, // TODO: トピック選択が実装されたら置き換え
-          content: text,
+          topic_id: fallbackTopicId,
+          content: sanitizedContent,
           reaction_ids,
         },
       };
-      if (imageBase64) {
-        body.post.image = imageBase64;
+      if (imagePayload) {
+        body.post.image = imagePayload.base64;
       }
       const rawText = text;
       const contentPreview =
         postType === "text"
           ? rawText
-          : rawText || (photo ? "写真を確認中です" : "");
+          : postType === "photo"
+            ? rawText || (photo ? "写真を確認中です" : "")
+            : postType === "both"
+              ? rawText || (photo ? "写真とテキストを確認中です" : "")
+              : "";
 
       let shouldResetSubmitState = true;
       try {
         setIsSubmitting(true);
         setSubmitMessage(shouldUseAiCheck ? "確認中..." : "投稿送信中...");
-        console.log("送信するJSON:", JSON.stringify(body));
+        console.log("送信する投稿データ:", {
+          ...body.post,
+          image: imagePayload ? `[base64:${imagePayload.base64.length}chars]` : undefined,
+          image_mimeType: imagePayload?.mimeType,
+          image_fileName: imagePayload?.fileName,
+        });
 
         // 投稿内容が通報対象でないことを確認するAPIに送信
         //{
@@ -181,7 +265,7 @@ export default function PostPage() {
         // }
         const report_body = {
           report: {
-            content: postType === "text" ? text : text,
+            content: text ?? "",
           },
         };
         if (shouldUseAiCheck) {
@@ -222,11 +306,32 @@ export default function PostPage() {
           body: JSON.stringify(body),
         });
         if (!res.ok) {
-          throw new Error("投稿失敗");
+          const contentType = res.headers.get("content-type");
+          let errorMessage = "投稿に失敗しました";
+          if (contentType?.includes("application/json")) {
+            try {
+              const errorJson = await res.json();
+              errorMessage =
+                (typeof errorJson?.message === "string" && errorJson.message) ||
+                (typeof errorJson?.error === "string" && errorJson.error) ||
+                JSON.stringify(errorJson);
+            } catch (parseError) {
+              console.warn("エラーレスポンスのJSON解析に失敗", parseError);
+            }
+          } else {
+            const errorText = await res.text();
+            if (errorText) {
+              errorMessage = errorText;
+            }
+          }
+
+          console.error("投稿APIエラー:", res.status, res.statusText, errorMessage);
+          throw new Error(errorMessage);
         }
         router.push(`/home?refresh=${Date.now()}`);
       } catch (err) {
-        setSubmitMessage("投稿に失敗しました");
+        const message = err instanceof Error ? err.message : "投稿に失敗しました";
+        setSubmitMessage(message);
         setIsSubmitting(false);
         shouldResetSubmitState = false;
         console.error(err);
@@ -270,9 +375,9 @@ export default function PostPage() {
         </div>
 
         {/* 投稿タイプ選択 */}
-        <div className="my-4 flex gap-4">
+        <div className="my-4 flex gap-2">
           <button
-            className={`flex-1 py-2 rounded-lg font-semibold transition ${
+            className={`flex-1 py-2 rounded-lg font-semibold transition text-sm ${
               postType === "text"
                 ? "bg-[#7ADAD5] text-white shadow-md"
                 : "bg-gray-100 hover:bg-gray-200"
@@ -280,13 +385,19 @@ export default function PostPage() {
             onClick={() => {
               setPostType("text");
               setPhoto(null);
-              setPreview(null);
+              setPreview((prev) => {
+                if (prev && prev.startsWith("blob:")) {
+                  URL.revokeObjectURL(prev);
+                }
+                return null;
+              });
+              setShouldUseAiCheck(true);
             }}
           >
             テキスト
           </button>
           <button
-            className={`flex-1 py-2 rounded-lg font-semibold transition ${
+            className={`flex-1 py-2 rounded-lg font-semibold transition text-sm ${
               postType === "photo"
                 ? "bg-[#7ADAD5] text-white shadow-md"
                 : "bg-gray-100 hover:bg-gray-200"
@@ -299,21 +410,34 @@ export default function PostPage() {
           >
             写真
           </button>
+          <button
+            className={`flex-1 py-2 rounded-lg font-semibold transition text-sm ${
+              postType === "both"
+                ? "bg-[#7ADAD5] text-white shadow-md"
+                : "bg-gray-100 hover:bg-gray-200"
+            }`}
+            onClick={() => {
+              setPostType("both");
+              setShouldUseAiCheck(true);
+            }}
+          >
+            テキスト+写真
+          </button>
         </div>
 
         {/* 投稿内容 */}
-        {postType === "text" && (
+        {(postType === "text" || postType === "both") && (
           <textarea
             className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-[#7ADAD5] focus:outline-none"
-            rows={5}
+            rows={postType === "both" ? 3 : 5}
             placeholder="ここに入力..."
             value={text}
             onChange={(e) => setText(e.target.value)}
           />
         )}
 
-        {postType === "photo" && (
-          <div>
+        {(postType === "photo" || postType === "both") && (
+          <div className="mt-4">
             <label className="block text-center py-3 border rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
               写真を選択
               <input
@@ -324,13 +448,16 @@ export default function PostPage() {
               />
             </label>
             {preview ? (
-              <Image
-                src={preview}
-                alt="preview"
-                width={400}
-                height={300}
-                className="mt-3 w-full rounded-lg shadow-md object-cover"
-              />
+              <div className="mt-3">
+                <Image
+                  src={preview}
+                  alt="preview"
+                  width={400}
+                  height={300}
+                  className="w-full rounded-lg shadow-md object-cover"
+                  unoptimized
+                />
+              </div>
             ) : (
               <p className="text-center text-sm text-gray-500 mt-2">
                 写真が選択されていません
