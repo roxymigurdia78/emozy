@@ -18,9 +18,18 @@ type ApiPost = {
     num_reactions?: { [id: string]: number };
     reacted_reaction_ids?: number[];
     is_favorited?: boolean;
+    icon_image_url?: string;
 };
-export default function Home() {
 
+const shuffleArray = (array: any[]) => {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
+};
+
+export default function Home() {
     const [posts, setPosts] = useState<Post[]>([]);
     const [currentUserId, setCurrentUserId] = useState("");
     useEffect(() => {
@@ -37,17 +46,18 @@ export default function Home() {
             .then(res => res.json())
             .then(data => {
             console.log("APIレスポンス:", data);
-            const posts = (data as ApiPost[]).map((item) => {
+            const posts = (data as ApiPost[]).map((item): Post => {
                 const reaction_ids = item.num_reactions
                 ? Object.keys(item.num_reactions).map(id => Number(id))
                 : [1, 2, 3];
                 const reaction_counts = item.num_reactions
                 ? Object.values(item.num_reactions)
                 : [0, 0, 0];
+                const iconUrl = item.icon_image_url || "/images/syoki2.png";
                 return {
                 id: item.id,
                 user: item.name,
-                userIconUrl: "/images/title.png",
+                userIconUrl: iconUrl,
                 content: item.content,
                 imageUrl: item.image_url,
                 reaction_ids,
@@ -56,7 +66,7 @@ export default function Home() {
                 is_favorited: !!item.is_favorited,
                 };
             });
-            setPosts(posts);
+            setPosts(shuffleArray(posts));
             })
             .catch(err => console.error("投稿取得エラー", err));
         }, []);
