@@ -57,7 +57,7 @@ docker compose up -d
 停止:
 
 ```bash
-docker compose down --remove-orphans
+docker compose down
 ```
 
 ### 2. フロントエンド起動
@@ -70,16 +70,17 @@ npm install
 npm run dev
 ```
 
-## 動作確認
+### 3. サインアップページにアクセス
 
-- フロント: http://localhost:3000
-- 推奨遷移開始: http://localhost:3000/signin または http://localhost:3000/signup
-- Rails APIヘルス: http://localhost:3333/api/v1/ping
-- FastAPIヘルス: http://localhost:8000/health
+```
+http://localhost:3000/signup
+```
 
 ## AI通報判定API（FastAPI）
 
 `docker-compose.yml` の環境変数で、LLM接続先（`LLM_BASE_URL` など）を設定します。
+
+LM Studioでサーバーを立てる必要があります。
 
 ## 使用技術
 
